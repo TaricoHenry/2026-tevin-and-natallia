@@ -2,7 +2,7 @@ host: 0.0.0.0
 
 # GitHub Pages URL (NO custom domain)
 url: https://taricohenry.github.io
-baseurl: /tevinandnatallia
+baseurl: /
 title: "Tevin and Natallia"
 
 exclude:
