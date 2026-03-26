@@ -16,9 +16,9 @@ body {
   background-repeat: repeat;
   background-size: contain;
 
-  width: 100vw;
-  max-width: 1200px;
-  margin: 0;
+  width: 100%;
+
+  margin: 0 auto 0 auto;
 
   h1 {
     font-family: $primaryFont;
@@ -29,7 +29,7 @@ body {
     line-height: 1em;
   }
 
-  p {
+  p, label {
     font-family: $secondaryFont;
   }
 
@@ -55,6 +55,11 @@ body {
   max-height: 100%;
   max-width: none;
   margin: 0;
+}
+
+.decor-line {
+  margin: 2em 0 2em 0;
+  width: 30%;
 }
 
 .content {
@@ -96,17 +101,19 @@ body {
 
   margin: auto 0 auto 0;
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
   flex-direction: column;
+  align-items: center;
 
   height: 100vh;
+  width: 100%;
 
   .content {
-
     height: 80%;
-    .pillar {
-      right: 0%;
-    }
+  }
+
+  .pillar {
+    right: 0%;
   }
 
 }
@@ -127,7 +134,6 @@ body {
     font-size: 4em;
     font-family: $primaryFont;
   }
-
   
   @media (max-width: 800px) {
     p {
@@ -156,6 +162,7 @@ body {
   p {
     font-size: 3em;
     padding: 1em;
+    color: black;
   }
 
   .text-image:nth-child(2) {
@@ -169,12 +176,25 @@ body {
   justify-content: space-evenly;
   height: 100vh;
 
-  p {
-    font-size: 1.5em;
+  p, label {
+    font-size: 1.75em;
+    font-family: $primaryFont;
+    text-align: center;
+    margin: 0.5em;
   }
+
+  .bold-var {
+    font-size: 3em;
+    color: $primaryColour;
+  }
+
   .content {
     flex-direction: column;
     align-items: center;
+  }
+
+  .symbol {
+    height: 6em;
   }
 
   .pillar:first-of-type {
@@ -182,17 +202,52 @@ body {
   }
   .pillar:last-of-type {
     left: 0%;
-    height: 60%;
+    height: 50%;
+  }
+
+  .guest-box {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+
+    background-color: white;
+    width: 80%;
+    margin: 0 10% 0 10%;
+    padding: 0 10% 0 5%;
+
+    border-left: $primaryColour solid 1em;
+
+    input {
+      color: $primaryColour;
+      height: 20px;
+    }
+
+  }
+
+  @media (max-width: 800px) {
+
+    p {
+      font-size: 1.25em;
+    }
+
+    .bold-var {
+      font-size: 2em;
+    }
+
+    .symbol {
+      height: 4em;
+    }
+
+    .pillar:last-of-type {
+      left: 0%;
+      height: 30%;
+    }
   }
 }
+
 .rsvp {
-  margin: auto 0 auto 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
-  height: 100vh;
-
-  .pillar {
-    right: 0%;
-  }
 }
+
