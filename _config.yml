@@ -1,3 +1,17 @@
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
-baseurl: "" # the subpath of your site, e.g. /blog
-title: "" # the name of your site, e.g. ACME Corp.
+host: 0.0.0.0
+
+# GitHub Pages URL (NO custom domain)
+url: https://taricohenry.github.io
+baseurl: /tevinandnatallia
+title: "Tevin and Natallia"
+
+exclude:
+  - firebase
+  - firebase/**
+  - vendor
+  - vendor/**
+  - node_modules
+  - node_modules/**
+  - Gemfile
+  - Gemfile.lock
+  - .jekyll-cache
