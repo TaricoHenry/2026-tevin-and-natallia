@@ -7,3 +7,4 @@ serviceAccountKey-DO NOT USE.json
 firebase-debug.log
 firebase/firestore-debug.log
 csv/guestList.csv
+serviceAccountKey.json

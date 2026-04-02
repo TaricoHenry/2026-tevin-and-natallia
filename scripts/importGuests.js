@@ -178,7 +178,7 @@ for (const row of records) {
     households.set(groupingKey, {
       code,
       uniqueUrl: `${BASE_URL}/${code}`,
-      household: householdName || `${name} Household`,
+      household: householdName || `${name}`,
       householdSize: householdSize,
       allResponded: false,
       members: [],

@@ -374,8 +374,8 @@ export default function AdminDashboard() {
 
         <div style={styles.loginShell}>
           <div style={styles.loginCard}>
-            <div style={styles.loginBadge}>Protected admin area</div>
-            <h1 style={styles.heroTitle}>RSVP Garden Console</h1>
+            <div style={styles.loginBadge}>Wedding Admin Portal</div>
+            <h1 style={styles.heroTitle}>Tevin and Natallia</h1>
             <p style={styles.heroSubtitle}>
               Sign in to manage households, guest details, unique codes, and RSVP progress.
             </p>
@@ -424,8 +424,8 @@ export default function AdminDashboard() {
       <div style={styles.dashboardContainer}>
         <div style={styles.topPanel}>
           <div>
-            <div style={styles.topBadge}>Admin dashboard</div>
-            <h1 style={styles.dashboardTitle}>RSVP Garden Console</h1>
+            <div style={styles.topBadge}>Wedding Admin Dashboard</div>
+            <h1 style={styles.dashboardTitle}>Tevin and Natallia</h1>
             <p style={styles.dashboardSubtitle}>
               Manage households, update invitation links, and track response progress in one place.
             </p>

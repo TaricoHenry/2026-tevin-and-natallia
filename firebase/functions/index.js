@@ -97,7 +97,7 @@ const defaultPageUrl = "https://tevinandnatalie.com/";
 // IMPORTANT:
 // In production these should come from environment variables
 // or Firebase runtime config, not be hardcoded in the file.
-const ADMIN_COOKIE_NAME = "rsvp_admin_session";
+const ADMIN_COOKIE_NAME = "__session";
 const ADMIN_BASE_PATH = "/admin";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "clientadmin";
 const ADMIN_PASSWORD_HASH =
@@ -138,6 +138,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "https://tevinandnatalie.com",
+  "https://tevin-wedding.web.app",
 ];
 
 // ===================================
@@ -553,7 +554,7 @@ router.post("/token/:token/reply", validateRequest(rsvpRequest), async (req, res
 // Admin Auth Routes
 // =======================
 
-// Admin login endpoint
+/// Admin login endpoint
 // Used by the /admin dashboard page to create an authenticated session.
 adminRouter.post("/login", validateRequest(adminLoginRequest), async (req, res) => {
   try {
@@ -581,10 +582,15 @@ adminRouter.post("/login", validateRequest(adminLoginRequest), async (req, res) 
       { expiresIn: "8h" }
     );
 
+    // Updated cookie settings:
+    // - secure stays true for production HTTPS
+    // - sameSite is relaxed from "strict" to "lax"
+    // - path is explicitly set so the cookie is sent to all admin routes
     res.cookie(ADMIN_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: "lax",
+      path: "/",
       maxAge: 8 * 60 * 60 * 1000,
     });
 
@@ -604,10 +610,13 @@ adminRouter.post("/login", validateRequest(adminLoginRequest), async (req, res) 
 
 // Admin logout endpoint
 adminRouter.post("/logout", (req, res) => {
+  // Updated cookie settings:
+  // These must match the cookie settings used when the cookie was created.
   res.clearCookie(ADMIN_COOKIE_NAME, {
     httpOnly: true,
-    secure: false,
+    secure: true,
     sameSite: "lax",
+    path: "/",
   });
 
   return res.status(200).json({
@@ -615,7 +624,6 @@ adminRouter.post("/logout", (req, res) => {
     message: "Logout successful",
   });
 });
-
 // All admin routes below this point require login
 adminRouter.use(adminAuthMiddleware);
 
