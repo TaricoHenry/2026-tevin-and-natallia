@@ -5,43 +5,113 @@ title: "Tevin & Natallia"
 
 <div class="welcome">
     <div class="content">
-        <img src="{{'./assets/images/main-image.jpeg' | relative_url}}" alt="">
-        <div>
+        <div class="title-img">
+            <img id="main-img" class="
+            drop-shadow" src="{{'./assets/images/main-image.jpeg' | relative_url}}" alt="">
+            <div class="corners">
+                <img class="corner" src="{{'./assets/images/corner.svg' | relative_url}}" alt="">
+                <img class="corner" src="{{'./assets/images/corner.svg' | relative_url}}" alt="">
+                <img class="corner" src="{{'./assets/images/corner.svg' | relative_url}}" alt="">
+                <img class="corner" src="{{'./assets/images/corner.svg' | relative_url}}" alt="">
+            </div>
+        </div>
+        <div class="title-words">
             <h1>Tevin &<br>Natallia</h1>
         </div>
     </div>
-    <img class="pillar" src="{{'./assets/images/border 2.png' | relative_url}}" alt="">
+    <img class="pillar-flower" src="{{'./assets/images/flower-side-2.png' | relative_url}}" alt="">
+    <div class="pillar-wooden"></div>
     <div class="countdown">
         <p class="date">2026-07-25</p>
-        <p class="time">00:00:00</p>
+        <p id="counter"></p>
+        <div class="counter">
+            <div class="drop-shadow">
+                <p class="int">00</p>
+                <p class="text">days</p>
+            </div>
+            <div class="drop-shadow">
+                <p class="int">00</p>
+                <p class="text">hours</p>
+            </div>
+            <div class="drop-shadow">
+                <p class="int">00</p>
+                <p class="text">minutes</p>
+            </div>
+            <div class="drop-shadow">
+                <p class="int">00</p>
+                <p class="text">seconds</p>
+            </div>
+        </div>
     </div>
 </div>
 <div class="story">
     <div class="content">
-        <div class="text-image">
-            <div class="placeholder">.</div>
-            <p>Text</p>
-        </div>
-        <div class="text-image">
-            <div class="placeholder">.</div>
-            <p>Text</p>
-        </div>
-        <div class="text-image">
-            <div class="placeholder">.</div>
-            <p>Text</p>
-        </div>
+        {%
+            include text-image.html
+            img="./assets/images/story_1.png"    
+            text="2024"
+            img-bkgd="./assets/images/flower-lineart-2.svg"
+            var="right"
+            angle="10"
+            left-percent="62"
+        %}
+        {%
+            include text-image.html
+            img="./assets/images/story_2.png"    
+            text="2025"
+            img-bkgd="./assets/images/flower-lineart-3.svg"
+            var="left"
+            angle="0"
+            left-percent="-60"
+        %}
+        {%
+            include text-image.html
+            img="./assets/images/story_3.png"    
+            text="2026"
+            img-bkgd="./assets/images/flower-lineart-4.svg"
+            var="right"
+            angle="15"
+            left-percent="52"
+        %}
     </div>
-    <img class="pillar" src="{{'./assets/images/border 1.png' | relative_url}}" alt="">
+    <img class="pillar-flower" src="{{'./assets/images/flower-side-1.png' | relative_url}}" alt="">
+    <div class="pillar-wooden"></div>
 </div>
 <div class="invitation">
     <div class="content">
         <img class="symbol" src="{{'./assets/images/flower-lineart-8.svg' | relative_url}}" alt="">
-        <p class="bold-var">Mr and Mrs Surname</p>
-        <p>You are invited to our Wedding Ceremony</p>
-        <p class="bold-var">25th July 2026 @ 14:00 hrs</p>
+        <p class="household">Mr and Mrs Surname</p>
+        <p>You are warmly invited to our Wedding Ceremony</p>
+
+        <div class="date-block">
+            <div class="date-column">
+                <div class="date-decorline"></div>
+                <p class="day">Saturday</p>
+                <div class="date-decorline"></div>
+            </div>
+            <div class="date-column">
+                <p class="month">July</p>
+                <p class="date">25</p>
+                <p class="year">2026</p>
+            </div>
+            <div class="date-column">
+                <div class="date-decorline"></div>
+                <p class="time">At 2pm</p>
+                <div class="date-decorline"></div>
+            </div>
+
+        </div>
+        <!--
+            <p class="bold-var">25th July 2026 @ 14:00 hrs</p>
+        -->
+        
         <p>Church World Prayer Vision Life Healing Center<br>At Anna Catherina, West Coast Demerara</p>
         <p>Reception to follow at Regency Suite Hotel</p>
-        <p>Monetary Gifts Only</p>
+        <img class="symbol" src="{{'./assets/images/cocktail.svg' | relative_url}}" alt="">
+        <p>Cocktail hour</br><span class="bold-var">17:00 hrs to 18:00 hrs</span></p>
+        <p class="note">Kindly note:</br>Monetary Gifts are preferred,</br>or you may honor us through our</p>
+        <a href="https://google.com">Gift Registry</a>
+        <p>Adults Only Reception</p>
         <img class="decor-line" src="{{'./assets/images/flower-decorline.png' | relative_url}}"></img>
         <div class="rsvp">
             <p>Kindly let us know who will be attending:</p>
@@ -59,8 +129,33 @@ title: "Tevin & Natallia"
                 </label>
                 <input type="checkbox">
             </div>
+                        <div class="guest-box">
+                <label>
+                    Mr Surname
+                </label>
+                <input type="checkbox">
+            </div>
+            <div class="guest-box">
+                <label>
+                    Mrs Surname
+                </label>
+                <input type="checkbox">
+            </div>
+                        <div class="guest-box">
+                <label>
+                    Mr Surname
+                </label>
+                <input type="checkbox">
+            </div>
+            <div class="guest-box">
+                <label>
+                    Mrs Surname
+                </label>
+                <input type="checkbox">
+            </div>
         </div>
     </div>
-    <img class="pillar" src="{{'./assets/images/border 4.png' | relative_url}}" alt="">
-    <img class="pillar" src="{{'./assets/images/border 3.png' | relative_url}}" alt="">
+    <img class="pillar-flower" src="{{'./assets/images/flower-corner-1.png' | relative_url}}" alt="">
+    <img class="pillar-flower" src="{{'./assets/images/flower-side-3.png' | relative_url}}" alt="">
+    <div class="pillar-wooden"></div>
 </div>

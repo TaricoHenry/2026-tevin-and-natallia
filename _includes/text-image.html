@@ -1,0 +1,11 @@
+{% if include.var == "right" %}
+    <div class="text-image text-image-right">
+{% else %}
+    <div class="text-image">
+{% endif %}
+        <div class="story-photo">
+            <img class="photo drop-shadow" src="{{ include.img | relative_url}}" alt="">
+            <img class="photo-decor" src="{{ include.img-bkgd | relative_url}}" style="rotate: {{ include.angle }}deg; left: {{ include.left-percent }}%" alt="">
+        </div>
+        <p>{{ include.text }}</p>
+    </div>

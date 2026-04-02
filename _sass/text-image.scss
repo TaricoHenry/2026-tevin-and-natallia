@@ -1,0 +1,53 @@
+.text-image {
+  display: inherit;
+  flex-direction: row;
+  width: 100%;
+  padding: 5% 0 5% 0;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+
+  .story-photo {
+    position: relative;
+    width: 40vw;
+    max-width: 300px;
+    height: 100%;
+
+    .photo {
+      width: 100%;
+      border: $frameColour 1em solid;
+      border-radius: 2em;
+    }
+    .photo-decor {
+      position: absolute;
+      height: 100%;
+      object-fit: contain;
+      z-index: -1;
+      transform: scaleX(-1);
+      filter: invert(38%) sepia(23%) saturate(733%) hue-rotate(40deg) brightness(100%) contrast(87%);
+    }
+  }
+
+  p {
+    font-family: $primaryFont;
+    font-size: 8em;
+    padding: 0;
+    margin: 0 0.5em 0 0.5em;
+    color: $frameColour;
+  }
+}
+
+@media (max-width: 800px) {
+  .text-image {
+    .story-photo {
+      width: 30vw;
+    }
+  }
+}
+
+.text-image-right {
+  flex-direction: row-reverse;
+  .story-photo .photo-decor {
+    transform: scaleX(1);
+  }
+}
