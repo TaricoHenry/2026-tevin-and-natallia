@@ -2,10 +2,18 @@
 import express from "express";
 const app = express();
 const router = express.Router();
+const adminRouter = express.Router();
 
+import cors from "cors";
 
 // APi validation library
 import Joi from "joi";
+
+
+// Admin auth helpers
+import cookieParser from "cookie-parser";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 
 //Firebase and firestore set-up
@@ -49,11 +57,53 @@ const rsvpRequest = Joi.object({
     }),
 });
 
+// Admin login validation
+const adminLoginRequest = Joi.object({
+  username: Joi.string().trim().required(),
+  password: Joi.string().required(),
+});
+
+// Admin household create/update validation
+const adminHouseholdRequest = Joi.object({
+  code: Joi.string().trim().length(6).required(),
+  uniqueUrl: Joi.string().uri().required(),
+  household: Joi.string().trim().required(),
+  householdSize: Joi.number().integer().min(1).required(),
+  members: Joi.array()
+    .items(
+      Joi.object({
+        memberId: Joi.string().trim().required(),
+        name: Joi.string().trim().required(),
+        personalizedAddy: Joi.string().allow("", null),
+        rsvp: Joi.string().valid("yes", "no").allow(null),
+      })
+    )
+    .min(1)
+    .required(),
+});
+
 // setting up api version
 const apiVersion = "/v1";
 
 //declaring global to store base page redirect url
 const defaultPageUrl = "https://tevinandnatalie.com/";
+
+// ===================================
+// Admin config
+// ===================================
+// Protect admin dashboard with username/password.
+// Successful login returns an httpOnly cookie session.
+//
+// IMPORTANT:
+// In production these should come from environment variables
+// or Firebase runtime config, not be hardcoded in the file.
+const ADMIN_COOKIE_NAME = "rsvp_admin_session";
+const ADMIN_BASE_PATH = "/admin";
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "clientadmin";
+const ADMIN_PASSWORD_HASH =
+  process.env.ADMIN_PASSWORD_HASH || bcrypt.hashSync("change-this-password", 10);
+const ADMIN_JWT_SECRET =
+  process.env.ADMIN_JWT_SECRET || "change-this-secret";
 
 // ===================================
 // Centralized response message constants
@@ -72,6 +122,52 @@ export const TOKEN_MESSAGES = {
 
 // Limit incoming JSON payload size for security (prevents large payload abuse)
 app.use(express.json({ limit: "10kb" }));
+
+// Parse cookies for admin session handling
+app.use(cookieParser());
+
+// ===================================
+// CORS CONFIGURATION (ADDED FOR ADMIN DASHBOARD)
+// ===================================
+// This enables cross-origin requests from your local React app
+// AND allows cookies (required for admin login session)
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "https://tevinandnatalie.com",
+];
+
+// ===================================
+// CORS CONFIGURATION (FIXED)
+// ===================================
+// IMPORTANT:
+// We create ONE shared corsMiddleware and use it for BOTH:
+// - normal requests
+// - preflight (OPTIONS) requests
+
+const corsMiddleware = cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+});
+
+app.use(corsMiddleware);
+
+// ===================================
+// FIX: HANDLE PREFLIGHT USING SAME MIDDLEWARE
+// ===================================
+// This ensures OPTIONS uses credentials: true as well
+app.options(/.*/, corsMiddleware);
 
 // Log every incoming request (useful for debugging and monitoring)
 app.use((req, res, next) => {
@@ -128,6 +224,58 @@ export const validateRequest = (schema, property = "body") => {
 // ======================================
 // End Validation Middleware
 // ======================================
+
+// ===================================
+// Shared Helper Functions
+// ===================================
+
+// Build a full RSVP URL from a 6 character code
+function buildUniqueUrl(code) {
+  return `https://tevinandnatalie.com/${code}`;
+}
+
+// Normalize code to 6 uppercase alphanumeric characters
+function normalizeCode(code) {
+  return String(code || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
+}
+
+// Determine whether every member in a household has responded
+function calculateAllResponded(members = []) {
+  return (
+    members.length > 0 &&
+    members.every((member) => member.rsvp === "yes" || member.rsvp === "no")
+  );
+}
+
+// ===================================
+// Admin Auth Middleware
+// ===================================
+/**
+ * Protects admin routes using a signed session token stored in a cookie.
+ */
+function adminAuthMiddleware(req, res, next) {
+  try {
+    const token = req.cookies?.[ADMIN_COOKIE_NAME];
+
+    if (!token) {
+      return res.status(401).json({
+        isSuccess: false,
+        message: "Unauthorized",
+      });
+    }
+
+    jwt.verify(token, ADMIN_JWT_SECRET);
+    return next();
+  } catch (error) {
+    return res.status(401).json({
+      isSuccess: false,
+      message: "Unauthorized",
+    });
+  }
+}
 
 // ===================================
 // Token Status Checker
@@ -195,7 +343,7 @@ export const checkTokenStatus = async (token, firebaseCollection) => {
 // ==========================================
 
 // =======================
-// Routes
+// Public RSVP Routes
 // =======================
 
 // Health check endpoint
@@ -259,18 +407,18 @@ router.get("/token/:token/status", async (req, res) => {
 router.get("/token", (req, res) =>{
     return res.status(200).json({
         personalizedAddy : "Mr. John",
-	    personalizedHouseholdAddy : "Mr. John",
-	    householdSize: "2",
-	    householdMembers: [
-	        {
+        personalizedHouseholdAddy : "Mr. John",
+        householdSize: "2",
+        householdMembers: [
+            {
                 name: "Jane",
                 personalizedAddy: "Miss Jane"
-	        },
+            },
             {
                 name: "Jonny",
                 personalizedAddy: "Little Jonny"
-	        }
-	    ]
+            }
+        ]
     })
 });
 */
@@ -340,16 +488,18 @@ router.post("/token/:token/reply", validateRequest(rsvpRequest), async (req, res
       });
     }
 
-    if (tokenStatus.used){
-        return res.status(409).json({
-            isSuccess: true,
+    // Token already fully used
+    if (tokenStatus.used) {
+      return res.status(409).json({
+        isSuccess: true,
         token,
         valid: true,
         used: true,
         message: tokenStatus.message,
         url: tokenStatus.redirectUrl,
-        })
+      });
     }
+
     const invitedGuestDocRef = invitedGuestsCollection.doc(token);
     const invitedGuestSnapshot = await invitedGuestDocRef.get();
     const invitedGuestData = invitedGuestSnapshot.data();
@@ -373,11 +523,7 @@ router.post("/token/:token/reply", validateRequest(rsvpRequest), async (req, res
       };
     });
 
-    const allResponded =
-      updatedMembers.length > 0 &&
-      updatedMembers.every(
-        (member) => member.rsvp === "yes" || member.rsvp === "no"
-      );
+    const allResponded = calculateAllResponded(updatedMembers);
 
     // Update the household document with member responses
     await invitedGuestDocRef.update({
@@ -402,27 +548,250 @@ router.post("/token/:token/reply", validateRequest(rsvpRequest), async (req, res
     });
   }
 });
+
+// =======================
+// Admin Auth Routes
+// =======================
+
+// Admin login endpoint
+// Used by the /admin dashboard page to create an authenticated session.
+adminRouter.post("/login", validateRequest(adminLoginRequest), async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (username !== ADMIN_USERNAME) {
+      return res.status(401).json({
+        isSuccess: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+
+    if (!passwordMatches) {
+      return res.status(401).json({
+        isSuccess: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const token = jwt.sign(
+      { username: ADMIN_USERNAME, role: "admin" },
+      ADMIN_JWT_SECRET,
+      { expiresIn: "8h" }
+    );
+
+    res.cookie(ADMIN_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 8 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      isSuccess: true,
+      message: "Login successful",
+    });
+  } catch (error) {
+    console.error("Admin login error:", error);
+
+    return res.status(500).json({
+      isSuccess: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// Admin logout endpoint
+adminRouter.post("/logout", (req, res) => {
+  res.clearCookie(ADMIN_COOKIE_NAME, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+  });
+
+  return res.status(200).json({
+    isSuccess: true,
+    message: "Logout successful",
+  });
+});
+
+// All admin routes below this point require login
+adminRouter.use(adminAuthMiddleware);
+
+// =======================
+// Admin Dashboard Routes
+// =======================
+
+// Read all households for admin dashboard table/grid view
+adminRouter.get("/households", async (req, res) => {
+  try {
+    const snapshot = await invitedGuestsCollection.orderBy("household").get();
+
+    const households = snapshot.docs.map((doc) => ({
+      ...doc.data(),
+    }));
+
+    return res.status(200).json({
+      isSuccess: true,
+      households,
+    });
+  } catch (error) {
+    console.error("Error loading households:", error);
+
+    return res.status(500).json({
+      isSuccess: false,
+      message: "Internal server error",
+    });
+  }
+});
+
+// Create household
+// Allows admin to add new guest households directly from the dashboard.
+adminRouter.post(
+  "/households",
+  validateRequest(adminHouseholdRequest),
+  async (req, res) => {
+    try {
+      const payload = req.body;
+      const code = normalizeCode(payload.code);
+
+      const existingSnapshot = await invitedGuestsCollection.doc(code).get();
+
+      if (existingSnapshot.exists) {
+        return res.status(409).json({
+          isSuccess: false,
+          message: "A household with that code already exists",
+        });
+      }
+
+      const members = payload.members.map((member, index) => ({
+        ...member,
+        memberId: member.memberId || `${code}_${index + 1}`,
+      }));
+
+      const allResponded = calculateAllResponded(members);
+
+      await invitedGuestsCollection.doc(code).set({
+        code,
+        uniqueUrl: payload.uniqueUrl || buildUniqueUrl(code),
+        household: payload.household,
+        householdSize: payload.householdSize || members.length,
+        allResponded,
+        respondedAt: allResponded ? FieldValue.serverTimestamp() : null,
+        members,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      return res.status(201).json({
+        isSuccess: true,
+        message: "Household created successfully",
+      });
+    } catch (error) {
+      console.error("Error creating household:", error);
+
+      return res.status(500).json({
+        isSuccess: false,
+        message: "Internal server error",
+      });
+    }
+  }
+);
+
+// Update household, including changing the 6 character code and URL
+// If the code changes, we create the new document and delete the old one.
+adminRouter.put(
+  "/households/:code",
+  validateRequest(adminHouseholdRequest),
+  async (req, res) => {
+    try {
+      const oldCode = normalizeCode(req.params.code);
+      const payload = req.body;
+      const newCode = normalizeCode(payload.code);
+
+      const oldDocRef = invitedGuestsCollection.doc(oldCode);
+      const oldSnapshot = await oldDocRef.get();
+
+      if (!oldSnapshot.exists) {
+        return res.status(404).json({
+          isSuccess: false,
+          message: "Household not found",
+        });
+      }
+
+      if (oldCode !== newCode) {
+        const newSnapshot = await invitedGuestsCollection.doc(newCode).get();
+
+        if (newSnapshot.exists) {
+          return res.status(409).json({
+            isSuccess: false,
+            message: "Another household already uses that code",
+          });
+        }
+      }
+
+      const members = payload.members.map((member, index) => ({
+        ...member,
+        memberId: member.memberId || `${newCode}_${index + 1}`,
+      }));
+
+      const allResponded = calculateAllResponded(members);
+
+      const updatedData = {
+        code: newCode,
+        uniqueUrl: payload.uniqueUrl || buildUniqueUrl(newCode),
+        household: payload.household,
+        householdSize: payload.householdSize || members.length,
+        allResponded,
+        respondedAt: allResponded ? FieldValue.serverTimestamp() : null,
+        members,
+        createdAt: oldSnapshot.data().createdAt || FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+
+      if (oldCode === newCode) {
+        await oldDocRef.set(updatedData, { merge: true });
+      } else {
+        const batch = db.batch();
+        batch.set(invitedGuestsCollection.doc(newCode), updatedData);
+        batch.delete(oldDocRef);
+        await batch.commit();
+      }
+
+      return res.status(200).json({
+        isSuccess: true,
+        message: "Household updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating household:", error);
+
+      return res.status(500).json({
+        isSuccess: false,
+        message: "Internal server error",
+      });
+    }
+  }
+);
+
 // ===================
 // End of router paths
 // ===================
 
 
-// connecting application to router and version "/v1", meaning every router path is prefixed with v1
+// connecting application to routers and version "/v1"
+// meaning every router path is prefixed with v1
 app.use(apiVersion, router);
+app.use(`${apiVersion}${ADMIN_BASE_PATH}`, adminRouter);
 
 // export firebase function
 export const api = onRequest(
   {
-    // allowing browsers to only hit from the url
-    cors: [
-      "https://tevinandnatalie.com",
-    ],
-
     //max instance for firebase
     maxInstances: 3,
     concurrency: 20,
   },
 
   //passing the express aplication straight to the firebase fucntion
-  app
+  app,
 );
