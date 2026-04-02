@@ -5,37 +5,55 @@ const router = express.Router();
 
 
 // APi validation library
-import Joi from "Joi";
+import Joi from "joi";
 
 
 //Firebase and firestore set-up
 import admin from "firebase-admin"; //import firbase sdk
 import { onRequest } from "firebase-functions/v2/https"; //using firbase function handler for http requests
-import {getFirestore, FieldValue} from "firebase-admin/firestore"; //importing firebase databse tools
+import { getFirestore, FieldValue } from "firebase-admin/firestore"; //importing firebase databse tools
 
-admin.initializeApp(); 
+admin.initializeApp();
 const db = getFirestore();
 
 //declaring global collect of guest stuff
-const invitedGuestsCollection = db.collection('InvitedGuests');
+const invitedGuestsCollection = db.collection("InvitedGuests");
 
 
 //Setting up API spec validation
+// Updated functionality:
+// RSVP is now submitted per member inside a household instead of a single RSVP value
 const rsvpRequest = Joi.object({
-    rsvp: Joi.string()
-    .valid("yes","no")
+  responses: Joi.array()
+    .items(
+      Joi.object({
+        memberId: Joi.string()
+          .trim()
+          .required()
+          .messages({
+            "string.empty": "memberId is required",
+          }),
+        rsvp: Joi.string()
+          .valid("yes", "no")
+          .required()
+          .messages({
+            "any.only": "rsvp value can only be yes or no",
+            "string.empty": "rsvp is required",
+          }),
+      })
+    )
+    .min(1)
     .required()
     .messages({
-        "any.only": "rsvp value can only be yes or no",
-        "string.empty": "rsvp is required"
-    })
+      "array.min": "at least one response is required",
+    }),
 });
 
 // setting up api version
 const apiVersion = "/v1";
 
 //declaring global to store base page redirect url
-const defaultPageUrl = "https://tevinandnatallia.com/";
+const defaultPageUrl = "https://tevinandnatalie.com/";
 
 // ===================================
 // Centralized response message constants
@@ -44,7 +62,7 @@ const defaultPageUrl = "https://tevinandnatallia.com/";
 // and avoids relying on fragile string comparisons
 export const TOKEN_MESSAGES = {
   NOT_FOUND: "Guest does not exist",
-  USED: "Token has already been used",
+  USED: "All household members have already responded",
   VALID: "Token is valid",
 };
 
@@ -96,7 +114,7 @@ export const validateRequest = (schema, property = "body") => {
 
     // Format Joi errors into a consistent API structure
     const errorDetails = error.details.map((detail) => ({
-      path: detail.path.join("."), // fixed bug: join (not Join)
+      path: detail.path.join("."),
       message: detail.message,
     }));
 
@@ -117,7 +135,11 @@ export const validateRequest = (schema, property = "body") => {
 /**
  * Determines whether a token:
  * 1. Exists in the database
- * 2. Has already been used
+ * 2. Has already been fully used
+ *
+ * Updated functionality:
+ * - A token is considered "used" only when ALL members in the household
+ *   have submitted a response.
  *
  * Why:
  * - Keeps business logic separate from route handlers
@@ -135,26 +157,36 @@ export const checkTokenStatus = async (token, firebaseCollection) => {
     return {
       exists: false,
       valid: false,
+      used: false,
       message: TOKEN_MESSAGES.NOT_FOUND,
     };
   }
 
   const invitedGuestData = invitedGuestSnapshot.data();
+  const members = invitedGuestData?.members || [];
 
-  // Token already used (RSVP exists)
-  if (invitedGuestData?.rsvp != null) {
+  const allResponded =
+    members.length > 0 &&
+    members.every(
+      (member) => member.rsvp === "yes" || member.rsvp === "no"
+    );
+
+  // Token already fully used (all household members responded)
+  if (allResponded) {
     return {
       exists: true,
-      valid: false,
+      valid: true,
+      used: true,
       message: TOKEN_MESSAGES.USED,
       redirectUrl: defaultPageUrl,
     };
   }
 
-  // Token is valid and unused
+  // Token is valid and not yet fully used
   return {
     exists: true,
     valid: true,
+    used: false,
     message: TOKEN_MESSAGES.VALID,
   };
 };
@@ -187,26 +219,29 @@ router.get("/token/:token/status", async (req, res) => {
         isSuccess: false,
         token,
         valid: false,
+        used: false,
         message: tokenStatus.message,
       });
     }
 
-    // Token already used
-    if (!tokenStatus.valid) {
+    // Token fully used
+    if (tokenStatus.used) {
       return res.status(200).json({
         isSuccess: true,
         token,
-        valid: false,
+        valid: true,
+        used: true,
         message: tokenStatus.message,
         url: tokenStatus.redirectUrl,
       });
     }
 
-    // Token is valid
+    // Token is valid and still open for responses
     return res.status(200).json({
       isSuccess: true,
       token,
       valid: true,
+      used: false,
       message: tokenStatus.message,
     });
   } catch (error) {
@@ -227,66 +262,71 @@ router.get("/token", (req, res) =>{
 	    personalizedHouseholdAddy : "Mr. John",
 	    householdSize: "2",
 	    householdMembers: [
-	        { 
+	        {
                 name: "Jane",
                 personalizedAddy: "Miss Jane"
 	        },
-            { 
+            {
                 name: "Jonny",
                 personalizedAddy: "Little Jonny"
 	        }
 	    ]
     })
-});*/
+});
+*/
 
 
 //setting up endpoint to retrieve info from the firestore
-router.get("/token/:token", async (req, res, next) => {
+// Updated functionality:
+// We now store one document per household code, so we can return the household
+// document directly instead of querying multiple guest docs by household name.
+router.get("/token/:token", async (req, res) => {
+  try {
+    const token = req.params.token;
 
-    const token = req.params.token
-    //get info from firestore
-    //setting a reference to the entire collection
-    //const invitedGuestsCollection = db.collection('InvitedGuests');
+    // lets use the built in get method
+    const invitedGuestSnapshot = await invitedGuestsCollection.doc(token).get();
 
-    //using a querry (not the most the efficient method)
-    //const invitedGuestSnapshot = invitedGuestsCollection.where('token', '==', `${req.params.token}`);
-    
-    //lets use the built in get method
-    const invitedGuestSnapshot = await invitedGuestsCollection.doc(`${token}`).get();
+    if (!invitedGuestSnapshot.exists) {
+      return res.status(404).json({
+        isSuccess: false,
+        token: `${token}`,
+        message: "guest does not exist",
+      });
+    } else {
+      const householdData = invitedGuestSnapshot.data();
 
-    if (!invitedGuestSnapshot.exists){
-        return res.status(404).json({
-            isSuccess: false,
-            token: `${token}`,
-            message: "guest does not exist"
-        });
-    }else {
-        console.log(JSON.stringify(invitedGuestSnapshot.data()))
-        const householdMembers = await invitedGuestsCollection.where('household', '==', `${invitedGuestSnapshot.data().household}`).get();
-        
-        householdMembers.forEach(doc => {
-            console.log(doc.data());
-        })
-            
-        return res.status(200).json({
-            household: invitedGuestSnapshot.data().household, 
-            members: householdMembers.docs.map(doc => doc.data().personalizedAddy)
-        })
+      return res.status(200).json({
+        isSuccess: true,
+        token: householdData.code,
+        household: householdData.household,
+        householdSize: householdData.householdSize,
+        allResponded: householdData.allResponded ?? false,
+        members: householdData.members || [],
+      });
     }
+  } catch (error) {
+    console.error("Error retrieving token data:", error);
 
-
-
-})
+    return res.status(500).json({
+      isSuccess: false,
+      message: "Internal server error",
+    });
+  }
+});
 
 
 // remember if you are retuning (req, res) that is middleware and it must be passed into the route definition
 // Submit RSVP response for a token
+// Updated functionality:
+// Frontend submits a single payload containing responses for all members in the household.
+// Each member is updated by memberId instead of storing one top-level rsvp field.
 router.post("/token/:token/reply", validateRequest(rsvpRequest), async (req, res) => {
   try {
     const { token } = req.params;
-    const { rsvp } = req.body;
+    const { responses } = req.body;
 
-    // Check whether the token exists and has not already been used
+    // Check whether the token exists
     const tokenStatus = await checkTokenStatus(token, invitedGuestsCollection);
 
     // Token does not exist
@@ -295,31 +335,63 @@ router.post("/token/:token/reply", validateRequest(rsvpRequest), async (req, res
         isSuccess: false,
         token,
         valid: false,
+        used: false,
         message: tokenStatus.message,
       });
     }
 
-    // Token has already been used
-    if (!tokenStatus.valid) {
-      return res.status(200).json({
-        isSuccess: false,
+    if (tokenStatus.used){
+        return res.status(409).json({
+            isSuccess: true,
         token,
-        valid: false,
+        valid: true,
+        used: true,
         message: tokenStatus.message,
         url: tokenStatus.redirectUrl,
-      });
+        })
     }
+    const invitedGuestDocRef = invitedGuestsCollection.doc(token);
+    const invitedGuestSnapshot = await invitedGuestDocRef.get();
+    const invitedGuestData = invitedGuestSnapshot.data();
+    const existingMembers = invitedGuestData?.members || [];
 
-    // Update the guest document with the RSVP response
-    await invitedGuestsCollection.doc(token).update({
-      rsvp,
-      respondedAt: FieldValue.serverTimestamp(),
+    // Build a quick lookup map for submitted responses
+    const responseMap = new Map(
+      responses.map((response) => [response.memberId, response.rsvp])
+    );
+
+    // Update matching members only
+    const updatedMembers = existingMembers.map((member) => {
+      if (!responseMap.has(member.memberId)) {
+        return member;
+      }
+
+      return {
+        ...member,
+        rsvp: responseMap.get(member.memberId),
+        respondedAt: new Date().toISOString(),
+      };
+    });
+
+    const allResponded =
+      updatedMembers.length > 0 &&
+      updatedMembers.every(
+        (member) => member.rsvp === "yes" || member.rsvp === "no"
+      );
+
+    // Update the household document with member responses
+    await invitedGuestDocRef.update({
+      members: updatedMembers,
+      allResponded,
+      respondedAt: allResponded ? FieldValue.serverTimestamp() : null,
+      updatedAt: FieldValue.serverTimestamp(),
     });
 
     return res.status(200).json({
       isSuccess: true,
       token,
-      message: "RSVP response recorded successfully",
+      allResponded,
+      message: "RSVP responses recorded successfully",
     });
   } catch (error) {
     console.error("Error recording RSVP response:", error);
@@ -340,19 +412,17 @@ app.use(apiVersion, router);
 
 // export firebase function
 export const api = onRequest(
-    {   
-        // allowing browsers to only hit from the url
-        cors: [
-            "https://tevinandnatallia.com"
-        ],
+  {
+    // allowing browsers to only hit from the url
+    cors: [
+      "https://tevinandnatalie.com",
+    ],
 
-        //max instance for firebase
-        maxInstances: 3,
-        concurrency: 20
-    },
+    //max instance for firebase
+    maxInstances: 3,
+    concurrency: 20,
+  },
 
-    //passing the express aplication straight to the firebase fucntion
-    app
+  //passing the express aplication straight to the firebase fucntion
+  app
 );
-
-
