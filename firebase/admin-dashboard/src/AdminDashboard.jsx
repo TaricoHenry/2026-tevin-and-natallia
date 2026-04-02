@@ -10,7 +10,13 @@ const API_BASE = "/v1/admin";
 // ===================================
 // EMPTY HOUSEHOLD TEMPLATE
 // ===================================
-// This is the default shape used when opening the "Add household" modal.
+// IMPORTANT CHANGE:
+// - code is system-generated
+// - uniqueUrl is system-generated
+// - memberId is system-generated
+//
+// These fields are still present in state because the UI displays them,
+// but they are NOT entered by the user.
 const emptyGuest = {
   household: "",
   householdSize: 1,
@@ -19,17 +25,6 @@ const emptyGuest = {
   allResponded: false,
   members: [{ memberId: "", name: "", personalizedAddy: "", rsvp: null }],
 };
-
-// ===================================
-// CODE NORMALIZER
-// ===================================
-// Keeps the unique household code uppercase, alphanumeric, and max 6 chars.
-function normalizeCode(code) {
-  return String(code || "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 6);
-}
 
 // ===================================
 // CSV VALUE ESCAPER
@@ -272,22 +267,23 @@ export default function AdminDashboard() {
   // ===================================
   // SAVE HOUSEHOLD
   // ===================================
-  // Normalizes the code, ensures URL/member IDs exist,
-  // then creates or updates the household through the API.
+  // IMPORTANT CHANGE:
+  // - code is NOT sent from the UI
+  // - uniqueUrl is NOT sent from the UI
+  // - memberId is NOT sent from the UI
+  //
+  // Those values are generated and controlled by the backend only.
   async function saveDraft() {
     setError("");
     setInfo("");
 
-    const normalizedCode = normalizeCode(draft.code);
-
     const payload = {
-      ...draft,
-      code: normalizedCode,
-      uniqueUrl: draft.uniqueUrl || `https://tevinandnatalie.com/${normalizedCode}`,
+      household: draft.household,
       householdSize: Number(draft.householdSize || draft.members.length || 1),
-      members: draft.members.map((member, index) => ({
-        ...member,
-        memberId: member.memberId || `${normalizedCode || "NEW"}_${index + 1}`,
+      members: draft.members.map((member) => ({
+        name: member.name,
+        personalizedAddy: member.personalizedAddy || "",
+        rsvp: member.rsvp || null,
       })),
     };
 
@@ -374,8 +370,8 @@ export default function AdminDashboard() {
 
         <div style={styles.loginShell}>
           <div style={styles.loginCard}>
-            <div style={styles.loginBadge}>Wedding Admin Portal</div>
-            <h1 style={styles.heroTitle}>Tevin and Natallia</h1>
+            <div style={styles.loginBadge}>Protected admin area</div>
+            <h1 style={styles.heroTitle}>Tevin and Natallia Wedding Admin Dashboard</h1>
             <p style={styles.heroSubtitle}>
               Sign in to manage households, guest details, unique codes, and RSVP progress.
             </p>
@@ -424,8 +420,8 @@ export default function AdminDashboard() {
       <div style={styles.dashboardContainer}>
         <div style={styles.topPanel}>
           <div>
-            <div style={styles.topBadge}>Wedding Admin Dashboard</div>
-            <h1 style={styles.dashboardTitle}>Tevin and Natallia</h1>
+            <div style={styles.topBadge}>Admin dashboard</div>
+            <h1 style={styles.dashboardTitle}>Tevin and Natallia Wedding Admin Dashboard</h1>
             <p style={styles.dashboardSubtitle}>
               Manage households, update invitation links, and track response progress in one place.
             </p>
@@ -557,6 +553,38 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* ===================================
+                  SYSTEM GENERATED IDENTIFIERS
+                  ===================================
+                  These are shown for visibility only.
+                  They are not editable by the user.
+              */}
+              {selected ? (
+                <div style={styles.readOnlyInfoGrid}>
+                  <label style={styles.label}>
+                    6-char code
+                    <input
+                      style={styles.inputReadOnly}
+                      value={draft.code || ""}
+                      readOnly
+                    />
+                  </label>
+
+                  <label style={styles.label}>
+                    Unique URL
+                    <input
+                      style={styles.inputReadOnly}
+                      value={draft.uniqueUrl || ""}
+                      readOnly
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div style={styles.info}>
+                  The 6-digit code and unique URL will be generated automatically when you save this household.
+                </div>
+              )}
+
               <div style={styles.formGrid}>
                 <label style={styles.label}>
                   Household
@@ -564,27 +592,6 @@ export default function AdminDashboard() {
                     style={styles.input}
                     value={draft.household}
                     onChange={(e) => updateDraftField("household", e.target.value)}
-                  />
-                </label>
-
-                <label style={styles.label}>
-                  6-char code
-                  <input
-                    style={styles.input}
-                    maxLength={6}
-                    value={draft.code}
-                    onChange={(e) =>
-                      updateDraftField("code", normalizeCode(e.target.value))
-                    }
-                  />
-                </label>
-
-                <label style={styles.label}>
-                  Unique URL
-                  <input
-                    style={styles.input}
-                    value={draft.uniqueUrl}
-                    onChange={(e) => updateDraftField("uniqueUrl", e.target.value)}
                   />
                 </label>
 
@@ -606,21 +613,19 @@ export default function AdminDashboard() {
                 <div>
                   <div style={styles.membersTitle}>Members</div>
                   <div style={styles.membersSubtitle}>
-                    Edit guest details, IDs, personalized greetings, and RSVP states
+                    Edit guest details, personalized greetings, and RSVP states. Member IDs are generated automatically.
                   </div>
                 </div>
               </div>
 
               {draft.members.map((member, index) => (
-                <div key={`${member.memberId}-${index}`} style={styles.memberBox}>
+                <div key={`${member.memberId || "new"}-${index}`} style={styles.memberBox}>
                   <label style={styles.label}>
                     Member ID
                     <input
-                      style={styles.input}
-                      value={member.memberId}
-                      onChange={(e) =>
-                        updateMember(index, "memberId", e.target.value)
-                      }
+                      style={styles.inputReadOnly}
+                      value={member.memberId || "Will be generated automatically"}
+                      readOnly
                     />
                   </label>
 
@@ -856,6 +861,21 @@ const styles = {
     outline: "none",
     fontSize: "14px",
     color: "#23412f",
+    boxShadow: "inset 0 1px 2px rgba(33, 53, 40, 0.03)",
+  },
+
+  // Read-only input styling for generated values
+  inputReadOnly: {
+    width: "100%",
+    marginTop: "4px",
+    padding: "13px 14px",
+    borderRadius: "14px",
+    border: "1px solid #d8e3d2",
+    background: "rgba(241, 245, 240, 0.95)",
+    boxSizing: "border-box",
+    outline: "none",
+    fontSize: "14px",
+    color: "#4c6453",
     boxShadow: "inset 0 1px 2px rgba(33, 53, 40, 0.03)",
   },
 
@@ -1195,6 +1215,13 @@ const styles = {
     lineHeight: 1.1,
     color: "#223c2d",
     letterSpacing: "-0.02em",
+  },
+
+  readOnlyInfoGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "18px",
+    marginBottom: "18px",
   },
 
   formGrid: {

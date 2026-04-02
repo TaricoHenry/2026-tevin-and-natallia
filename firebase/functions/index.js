@@ -20,6 +20,7 @@ import jwt from "jsonwebtoken";
 import admin from "firebase-admin"; //import firbase sdk
 import { onRequest } from "firebase-functions/v2/https"; //using firbase function handler for http requests
 import { getFirestore, FieldValue } from "firebase-admin/firestore"; //importing firebase databse tools
+import crypto from "crypto";
 
 admin.initializeApp();
 const db = getFirestore();
@@ -64,15 +65,18 @@ const adminLoginRequest = Joi.object({
 });
 
 // Admin household create/update validation
+// IMPORTANT CHANGE:
+// - code is NO LONGER accepted from the client
+// - uniqueUrl is NO LONGER accepted from the client
+// - memberId is NO LONGER accepted from the client
+//
+// These values are system-generated only.
 const adminHouseholdRequest = Joi.object({
-  code: Joi.string().trim().length(6).required(),
-  uniqueUrl: Joi.string().uri().required(),
   household: Joi.string().trim().required(),
   householdSize: Joi.number().integer().min(1).required(),
   members: Joi.array()
     .items(
       Joi.object({
-        memberId: Joi.string().trim().required(),
         name: Joi.string().trim().required(),
         personalizedAddy: Joi.string().allow("", null),
         rsvp: Joi.string().valid("yes", "no").allow(null),
@@ -241,6 +245,32 @@ function normalizeCode(code) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 6);
+}
+
+// Generate a unique 6 character code
+// IMPORTANT:
+// - This is server-side only
+// - Users/admin UI do not enter this manually
+function generateRandomCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 6 }, () => {
+    const i = crypto.randomInt(0, chars.length);
+    return chars[i];
+  }).join("");
+}
+
+// Generate a unique household code by checking Firestore
+async function generateUniqueHouseholdCode(firebaseCollection) {
+  let code = "";
+  let exists = true;
+
+  while (exists) {
+    code = generateRandomCode();
+    const snapshot = await firebaseCollection.doc(code).get();
+    exists = snapshot.exists;
+  }
+
+  return code;
 }
 
 // Determine whether every member in a household has responded
@@ -624,6 +654,7 @@ adminRouter.post("/logout", (req, res) => {
     message: "Logout successful",
   });
 });
+
 // All admin routes below this point require login
 adminRouter.use(adminAuthMiddleware);
 
@@ -656,33 +687,34 @@ adminRouter.get("/households", async (req, res) => {
 
 // Create household
 // Allows admin to add new guest households directly from the dashboard.
+//
+// IMPORTANT CHANGE:
+// - code is generated on the server
+// - uniqueUrl is generated from that code
+// - memberId values are generated on the server
 adminRouter.post(
   "/households",
   validateRequest(adminHouseholdRequest),
   async (req, res) => {
     try {
       const payload = req.body;
-      const code = normalizeCode(payload.code);
 
-      const existingSnapshot = await invitedGuestsCollection.doc(code).get();
+      // Generate a brand new unique household code on the server
+      const code = await generateUniqueHouseholdCode(invitedGuestsCollection);
 
-      if (existingSnapshot.exists) {
-        return res.status(409).json({
-          isSuccess: false,
-          message: "A household with that code already exists",
-        });
-      }
-
+      // Generate member IDs automatically from the code
       const members = payload.members.map((member, index) => ({
-        ...member,
-        memberId: member.memberId || `${code}_${index + 1}`,
+        name: member.name,
+        personalizedAddy: member.personalizedAddy || null,
+        rsvp: member.rsvp ?? null,
+        memberId: `${code}_${index + 1}`,
       }));
 
       const allResponded = calculateAllResponded(members);
 
       await invitedGuestsCollection.doc(code).set({
         code,
-        uniqueUrl: payload.uniqueUrl || buildUniqueUrl(code),
+        uniqueUrl: buildUniqueUrl(code),
         household: payload.household,
         householdSize: payload.householdSize || members.length,
         allResponded,
@@ -707,65 +739,59 @@ adminRouter.post(
   }
 );
 
-// Update household, including changing the 6 character code and URL
-// If the code changes, we create the new document and delete the old one.
+// Update household
+//
+// IMPORTANT CHANGE:
+// - Household code can NO LONGER be changed
+// - Unique URL can NO LONGER be changed
+// - Existing member IDs are preserved automatically
+// - New member IDs are generated automatically only for new members
 adminRouter.put(
   "/households/:code",
   validateRequest(adminHouseholdRequest),
   async (req, res) => {
     try {
-      const oldCode = normalizeCode(req.params.code);
+      const code = normalizeCode(req.params.code);
       const payload = req.body;
-      const newCode = normalizeCode(payload.code);
 
-      const oldDocRef = invitedGuestsCollection.doc(oldCode);
-      const oldSnapshot = await oldDocRef.get();
+      const docRef = invitedGuestsCollection.doc(code);
+      const snapshot = await docRef.get();
 
-      if (!oldSnapshot.exists) {
+      if (!snapshot.exists) {
         return res.status(404).json({
           isSuccess: false,
           message: "Household not found",
         });
       }
 
-      if (oldCode !== newCode) {
-        const newSnapshot = await invitedGuestsCollection.doc(newCode).get();
+      const existingData = snapshot.data();
+      const existingMembers = existingData?.members || [];
 
-        if (newSnapshot.exists) {
-          return res.status(409).json({
-            isSuccess: false,
-            message: "Another household already uses that code",
-          });
-        }
-      }
-
+      // Preserve existing member IDs by index position.
+      // New rows get a fresh system-generated member ID.
       const members = payload.members.map((member, index) => ({
-        ...member,
-        memberId: member.memberId || `${newCode}_${index + 1}`,
+        name: member.name,
+        personalizedAddy: member.personalizedAddy || null,
+        rsvp: member.rsvp ?? null,
+        memberId: existingMembers[index]?.memberId || `${code}_${index + 1}`,
+        respondedAt: existingMembers[index]?.respondedAt || null,
       }));
 
       const allResponded = calculateAllResponded(members);
 
       const updatedData = {
-        code: newCode,
-        uniqueUrl: payload.uniqueUrl || buildUniqueUrl(newCode),
+        code, // immutable
+        uniqueUrl: buildUniqueUrl(code), // immutable and always derived from code
         household: payload.household,
         householdSize: payload.householdSize || members.length,
         allResponded,
         respondedAt: allResponded ? FieldValue.serverTimestamp() : null,
         members,
-        createdAt: oldSnapshot.data().createdAt || FieldValue.serverTimestamp(),
+        createdAt: existingData.createdAt || FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       };
 
-      if (oldCode === newCode) {
-        await oldDocRef.set(updatedData, { merge: true });
-      } else {
-        const batch = db.batch();
-        batch.set(invitedGuestsCollection.doc(newCode), updatedData);
-        batch.delete(oldDocRef);
-        await batch.commit();
-      }
+      await docRef.set(updatedData, { merge: true });
 
       return res.status(200).json({
         isSuccess: true,
@@ -785,7 +811,6 @@ adminRouter.put(
 // ===================
 // End of router paths
 // ===================
-
 
 // connecting application to routers and version "/v1"
 // meaning every router path is prefixed with v1
