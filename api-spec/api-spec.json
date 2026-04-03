@@ -1,0 +1,975 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Wedding RSVP Admin + Public API",
+    "version": "1.0.0",
+    "description": "OpenAPI spec generated from the current index.js implementation. Public endpoints are under /v1 and admin endpoints are under /v1/admin. Admin authentication uses an HTTP-only cookie named __session."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Relative server root"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Public",
+      "description": "Guest-facing RSVP endpoints"
+    },
+    {
+      "name": "Admin Auth",
+      "description": "Admin login/logout endpoints"
+    },
+    {
+      "name": "Admin Households",
+      "description": "Protected household management endpoints"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "AdminSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__session",
+        "description": "HTTP-only admin session cookie issued by POST /v1/admin/login"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Internal server error"
+          }
+        },
+        "required": ["isSuccess", "message"]
+      },
+      "ValidationErrorItem": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "example": "responses.0.rsvp"
+          },
+          "message": {
+            "type": "string",
+            "example": "rsvp value can only be yes or no"
+          }
+        },
+        "required": ["path", "message"]
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Validation error"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorItem"
+            }
+          }
+        },
+        "required": ["isSuccess", "message", "errors"]
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "example": "AB12CD_1"
+          },
+          "name": {
+            "type": "string",
+            "example": "John Smith"
+          },
+          "personalizedAddy": {
+            "type": "string",
+            "nullable": true,
+            "example": "Mr. John"
+          },
+          "rsvp": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["yes", "no"],
+            "example": "yes"
+          },
+          "respondedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "example": "2026-04-02T12:00:00.000Z"
+          }
+        },
+        "required": ["memberId", "name"]
+      },
+      "Household": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "AB12CD"
+          },
+          "uniqueUrl": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://tevinandnatalie.com/AB12CD"
+          },
+          "household": {
+            "type": "string",
+            "example": "The Smith Family"
+          },
+          "householdSize": {
+            "type": "integer",
+            "example": 2
+          },
+          "allResponded": {
+            "type": "boolean",
+            "example": false
+          },
+          "respondedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            }
+          },
+          "createdAt": {
+            "description": "Firestore server timestamp",
+            "nullable": true
+          },
+          "updatedAt": {
+            "description": "Firestore server timestamp",
+            "nullable": true
+          }
+        },
+        "required": ["code", "uniqueUrl", "household", "householdSize", "allResponded", "members"]
+      },
+      "TokenStatusSuccessUnused": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "example": "AB12CD"
+          },
+          "valid": {
+            "type": "boolean",
+            "example": true
+          },
+          "used": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Token is valid"
+          }
+        },
+        "required": ["isSuccess", "token", "valid", "used", "message"]
+      },
+      "TokenStatusSuccessUsed": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "example": "AB12CD"
+          },
+          "valid": {
+            "type": "boolean",
+            "example": true
+          },
+          "used": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "All household members have already responded"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://tevinandnatalie.com/"
+          }
+        },
+        "required": ["isSuccess", "token", "valid", "used", "message", "url"]
+      },
+      "TokenStatusNotFound": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "token": {
+            "type": "string",
+            "example": "BAD123"
+          },
+          "valid": {
+            "type": "boolean",
+            "example": false
+          },
+          "used": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Guest does not exist"
+          }
+        },
+        "required": ["isSuccess", "token", "valid", "used", "message"]
+      },
+      "GetTokenSuccess": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "example": "AB12CD"
+          },
+          "household": {
+            "type": "string",
+            "example": "The Smith Family"
+          },
+          "householdSize": {
+            "type": "integer",
+            "example": 2
+          },
+          "allResponded": {
+            "type": "boolean",
+            "example": false
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Member"
+            }
+          }
+        },
+        "required": ["isSuccess", "token", "household", "householdSize", "allResponded", "members"]
+      },
+      "GetTokenNotFound": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "token": {
+            "type": "string",
+            "example": "BAD123"
+          },
+          "message": {
+            "type": "string",
+            "example": "guest does not exist"
+          }
+        },
+        "required": ["isSuccess", "token", "message"]
+      },
+      "RsvpResponseItem": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "example": "AB12CD_1"
+          },
+          "rsvp": {
+            "type": "string",
+            "enum": ["yes", "no"],
+            "example": "yes"
+          }
+        },
+        "required": ["memberId", "rsvp"]
+      },
+      "RsvpRequest": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/RsvpResponseItem"
+            }
+          }
+        },
+        "required": ["responses"]
+      },
+      "RsvpSuccess": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "example": "AB12CD"
+          },
+          "allResponded": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "RSVP responses recorded successfully"
+          }
+        },
+        "required": ["isSuccess", "token", "allResponded", "message"]
+      },
+      "RsvpUsedConflict": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "example": "AB12CD"
+          },
+          "valid": {
+            "type": "boolean",
+            "example": true
+          },
+          "used": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "All household members have already responded"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://tevinandnatalie.com/"
+          }
+        },
+        "required": ["isSuccess", "token", "valid", "used", "message", "url"]
+      },
+      "AdminLoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "clientadmin"
+          },
+          "password": {
+            "type": "string",
+            "example": "your-password"
+          }
+        },
+        "required": ["username", "password"]
+      },
+      "AdminMessageResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Login successful"
+          }
+        },
+        "required": ["isSuccess", "message"]
+      },
+      "AdminHouseholdMemberInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "John Smith"
+          },
+          "personalizedAddy": {
+            "type": "string",
+            "nullable": true,
+            "example": "Mr. John"
+          },
+          "rsvp": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["yes", "no"],
+            "example": "yes"
+          }
+        },
+        "required": ["name"]
+      },
+      "AdminHouseholdRequest": {
+        "type": "object",
+        "properties": {
+          "household": {
+            "type": "string",
+            "example": "The Smith Family"
+          },
+          "householdSize": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 2
+          },
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/AdminHouseholdMemberInput"
+            }
+          }
+        },
+        "required": ["household", "householdSize", "members"]
+      },
+      "AdminListHouseholdsResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": true
+          },
+          "households": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Household"
+            }
+          }
+        },
+        "required": ["isSuccess", "households"]
+      },
+      "UnauthorizedResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Unauthorized"
+          }
+        },
+        "required": ["isSuccess", "message"]
+      },
+      "InvalidCredentialsResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid credentials"
+          }
+        },
+        "required": ["isSuccess", "message"]
+      },
+      "HouseholdNotFoundResponse": {
+        "type": "object",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Household not found"
+          }
+        },
+        "required": ["isSuccess", "message"]
+      }
+    },
+    "responses": {
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/v1/ready": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "Health check",
+        "operationId": "getReady",
+        "responses": {
+          "200": {
+            "description": "API ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMessageResponse"
+                },
+                "example": {
+                  "isSuccess": true,
+                  "message": "API is ready to accept requests"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/token/{token}/status": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "Check token status",
+        "operationId": "getTokenStatus",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Household code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token exists; may be unused or already fully used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TokenStatusSuccessUnused"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TokenStatusSuccessUsed"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenStatusNotFound"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/v1/token/{token}": {
+      "get": {
+        "tags": ["Public"],
+        "summary": "Get household by token",
+        "operationId": "getTokenHousehold",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Household code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Household found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTokenSuccess"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetTokenNotFound"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/v1/token/{token}/reply": {
+      "post": {
+        "tags": ["Public"],
+        "summary": "Submit RSVP responses for household members",
+        "operationId": "postTokenReply",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Household code"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RsvpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RSVP responses recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsvpSuccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenStatusNotFound"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Token already fully used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RsvpUsedConflict"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/v1/admin/login": {
+      "post": {
+        "tags": ["Admin Auth"],
+        "summary": "Admin login",
+        "operationId": "postAdminLogin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful; sets __session cookie",
+            "headers": {
+              "Set-Cookie": {
+                "description": "HTTP-only admin session cookie"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMessageResponse"
+                },
+                "example": {
+                  "isSuccess": true,
+                  "message": "Login successful"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidCredentialsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/v1/admin/logout": {
+      "post": {
+        "tags": ["Admin Auth"],
+        "summary": "Admin logout",
+        "operationId": "postAdminLogout",
+        "responses": {
+          "200": {
+            "description": "Logout successful; clears __session cookie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMessageResponse"
+                },
+                "example": {
+                  "isSuccess": true,
+                  "message": "Logout successful"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/households": {
+      "get": {
+        "tags": ["Admin Households"],
+        "summary": "List households",
+        "operationId": "getAdminHouseholds",
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of households",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminListHouseholdsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Admin Households"],
+        "summary": "Create household",
+        "operationId": "postAdminHouseholds",
+        "description": "Creates a household. The backend generates code, uniqueUrl, and memberId values.",
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminHouseholdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Household created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMessageResponse"
+                },
+                "example": {
+                  "isSuccess": true,
+                  "message": "Household created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/v1/admin/households/{code}": {
+      "put": {
+        "tags": ["Admin Households"],
+        "summary": "Update household",
+        "operationId": "putAdminHouseholdByCode",
+        "description": "Updates an existing household. Household code and uniqueUrl remain immutable; existing memberId values are preserved by the backend.",
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing household code"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminHouseholdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Household updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMessageResponse"
+                },
+                "example": {
+                  "isSuccess": true,
+                  "message": "Household updated successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Household not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdNotFoundResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  }
+}
