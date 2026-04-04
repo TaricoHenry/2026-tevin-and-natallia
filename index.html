@@ -3,7 +3,7 @@ layout: default
 title: "Tevin & Natallia"
 ---
 
-<div class="welcome">
+<div class="welcome" style="display: none;">
     <div class="content">
         <div class="title-img fadein left">
             <img id="main-img" class="
@@ -44,7 +44,7 @@ title: "Tevin & Natallia"
         </div>
     </div>
 </div>
-<div class="story">
+<div class="story" style="display: none;">
     <div class="content">
         {%
             include text-image.html
@@ -77,10 +77,10 @@ title: "Tevin & Natallia"
     <img class="pillar-flower" src="{{'./assets/images/flower-side-1.png' | relative_url}}" alt="">
     <div class="pillar-wooden"></div>
 </div>
-<div class="invitation">
+<div class="invitation" style="display: none;">
     <div class="content">
         <img class="symbol" src="{{'./assets/images/flower-lineart-8.svg' | relative_url}}" alt="">
-        <p class="household">Mr and Mrs Surname</p>
+        <p class="household"></p>
         <p>You are warmly invited to our Wedding Ceremony</p>
 
         <div class="date-block">
@@ -115,46 +115,7 @@ title: "Tevin & Natallia"
         <p>For those who wish to dress to compliment our day, see our recommended <a href="/colours">Colour Scheme</a></p>
         <img class="decor-line" src="{{'./assets/images/flower-decorline.png' | relative_url}}"></img>
         <div class="rsvp">
-            <p>Kindly let us know who will be attending:</p>
-            </br>
-            </br>
-            <div class="guest-box">
-                <label>
-                    Mr Surname
-                </label>
-                <input type="checkbox" onclick="checked(this)"/>
-            </div>
-            <div class="guest-box">
-                <label>
-                    Mrs Surname
-                </label>
-                <input type="checkbox">
-            </div>
-                        <div class="guest-box">
-                <label>
-                    Mr Surname
-                </label>
-                <input type="checkbox">
-            </div>
-            <div class="guest-box">
-                <label>
-                    Mrs Surname
-                </label>
-                <input type="checkbox">
-            </div>
-                        <div class="guest-box">
-                <label>
-                    Mr Surname
-                </label>
-                <input type="checkbox">
-            </div>
-            <div class="guest-box">
-                <label>
-                    Mrs Surname
-                </label>
-                <input type="checkbox">
-            </div>
-            <input id="submit" type="button" value="Submit" onclick="checkToken()">
+            <input id="submit" type="button" value="Submitted">
         </div>
     </div>
     <img class="pillar-flower" src="{{'./assets/images/flower-corner-1.png' | relative_url}}" alt="">

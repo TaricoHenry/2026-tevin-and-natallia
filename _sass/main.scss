@@ -53,7 +53,7 @@ body {
 
   @media (max-width: 800px) {
     h1 {
-      font-size: 7.5vw;
+      font-size: 9vw;
     }
   }
   @media (min-width: 1200px) {
@@ -308,7 +308,8 @@ body {
   }
 
   .content {
-    margin: 5em 0 5em 0;
+    padding: 0% 7.5% 0% 7.5%;
+    margin: 5% 0 5% 0;
     height: 100%;
   }
 }
@@ -417,6 +418,7 @@ body {
     text-align: center;
     margin: 0.5em;
     overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .bold-var {
@@ -459,14 +461,18 @@ body {
     background-color: white;
     width: 80%;
     margin: 0 10% 0 10%;
-    padding: 0 10% 0 5%;
+    padding: 2.5% 10% 2.5% 5%;
 
     border-left: $primaryColour solid 1em;
 
+    label {
+      text-align: left;
+    }
+
     input {
       color: $primaryColour;
-      height: 0.75em;
-      width: 0.75em;
+      height: 1em;
+      width: 1em;
     }
 
   }
@@ -483,7 +489,17 @@ body {
     font-size: 0.75em;
 
     p, label, input {
-      font-size: 1.25em;
+      font-size: 1.5em;
+    }
+
+    .guest-box {
+      label {
+        font-size: 1.5em;
+      }
+      input {
+        height: 1.75em;
+        width: 1.75em;
+      }
     }
 
     .bold-var {
