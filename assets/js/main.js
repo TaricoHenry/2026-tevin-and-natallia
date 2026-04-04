@@ -23,3 +23,42 @@ var x = setInterval(function() {
 
 }, 1000);
 
+//START fade in code
+
+const observer = new IntersectionObserver((entries)=>{
+    entries.forEach((entry)=>{
+        if (entry.isIntersecting) {
+            console.log(entry.target)
+            entry.target.classList.add("appear")
+        }
+    })
+},{})
+
+const animElements = document.querySelectorAll(".fadein")
+animElements.forEach(el => observer.observe(el))
+
+//END fade in code
+
+//START checkbox code
+
+function checked() {
+    var box = window.event.target;
+    console.log(box);
+}
+
+//END checkbox code
+
+async function checkToken() {
+    url = ('https://us-central1-ash-wedding.cloudfunctions.net:443/api/v1/token/EXRRQC/status')
+    try {
+        const response = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                }
+            })
+        console.log(response)
+    } catch (error) {
+        console.error(error.message);
+    }
+}

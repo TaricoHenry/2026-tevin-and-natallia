@@ -5,12 +5,12 @@
   padding: 5% 0 5% 0;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
+  overflow:visible;
 
   .story-photo {
     position: relative;
-    width: 40vw;
-    max-width: 300px;
+    width: 60%;
+    max-width: 270px;
     height: 100%;
 
     .photo {
@@ -39,12 +39,18 @@
 
 @media (max-width: 800px) {
   .text-image {
-    .story-photo {
-      width: 30vw;
+    p {
+      font-size: 6em;
     }
   }
 }
-
+@media (min-width: 1200px) {
+  .text-image {
+    .story-photo {
+      max-width: 500px;
+    }
+  }
+}
 .text-image-right {
   flex-direction: row-reverse;
   .story-photo .photo-decor {

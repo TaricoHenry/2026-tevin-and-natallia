@@ -5,7 +5,7 @@ title: "Tevin & Natallia"
 
 <div class="welcome">
     <div class="content">
-        <div class="title-img">
+        <div class="title-img fadein left">
             <img id="main-img" class="
             drop-shadow" src="{{'./assets/images/main-image.jpeg' | relative_url}}" alt="">
             <div class="corners">
@@ -15,7 +15,7 @@ title: "Tevin & Natallia"
                 <img class="corner" src="{{'./assets/images/corner.svg' | relative_url}}" alt="">
             </div>
         </div>
-        <div class="title-words">
+        <div class="title-words fadein left">
             <h1>Tevin &<br>Natallia</h1>
         </div>
     </div>
@@ -109,9 +109,10 @@ title: "Tevin & Natallia"
         <p>Reception to follow at Regency Suite Hotel</p>
         <img class="symbol" src="{{'./assets/images/cocktail.svg' | relative_url}}" alt="">
         <p>Cocktail hour</br><span class="bold-var">17:00 hrs to 18:00 hrs</span></p>
-        <p class="note">Kindly note:</br>Monetary Gifts are preferred,</br>or you may honor us through our</p>
-        <a href="https://google.com">Gift Registry</a>
-        <p>Adults Only Reception</p>
+        <p class="note">kindly note:<br><br>Monetary Gifts are preferred, or you may honor us through our <br>
+        <a href="https://www.amazon.com/wedding/guest-view/3GS5OIS9MSEDU">Gift Registry</a></p>
+        <p>We want our guests to enjoy a relaxing evening, so this will be an adults - only event</p>
+        <p>See here for recommended colour scheme choices</p>
         <img class="decor-line" src="{{'./assets/images/flower-decorline.png' | relative_url}}"></img>
         <div class="rsvp">
             <p>Kindly let us know who will be attending:</p>
@@ -121,7 +122,7 @@ title: "Tevin & Natallia"
                 <label>
                     Mr Surname
                 </label>
-                <input type="checkbox">
+                <input type="checkbox" onclick="checked()"/>
             </div>
             <div class="guest-box">
                 <label>
@@ -153,6 +154,7 @@ title: "Tevin & Natallia"
                 </label>
                 <input type="checkbox">
             </div>
+            <input id="submit" type="button" value="Submit" onclick="checkToken()">
         </div>
     </div>
     <img class="pillar-flower" src="{{'./assets/images/flower-corner-1.png' | relative_url}}" alt="">

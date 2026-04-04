@@ -1,7 +1,7 @@
 {% if include.var == "right" %}
-    <div class="text-image text-image-right">
+    <div class="text-image text-image-right fadein right">
 {% else %}
-    <div class="text-image">
+    <div class="text-image fadein left">
 {% endif %}
         <div class="story-photo">
             <img class="photo drop-shadow" src="{{ include.img | relative_url}}" alt="">

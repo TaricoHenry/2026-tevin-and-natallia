@@ -14,6 +14,7 @@ html {
   padding: 0;
   margin:0;
   width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
@@ -54,6 +55,29 @@ body {
       font-size: 7.5vw;
     }
   }
+  @media (min-width: 1200px) {
+    h1 {
+      font-size: 125px;
+    }
+  }
+}
+
+.fadein {
+  opacity: 0;
+  filter: blur(5px);
+  transition: all 1.75s;
+}
+.fadein.left {
+  transform: translateX(50%);
+}
+.fadein.right {
+  transform: translateX(-50%);
+}
+
+.fadein.appear {
+  opacity: 1;
+  filter: blur(0px);
+  transform: translateX(0%);
 }
 
 .pillar-flower {
@@ -103,7 +127,7 @@ body {
 
   .corner {
     position: absolute;
-    width: 10em;
+    width: 25%;
     object-fit: contain;
     margin: 0;
     filter: brightness(0) invert(1);
@@ -139,10 +163,14 @@ body {
 .content {
   display: flex;
   flex-direction: row;
-  padding: 0 20px 0 20px;
-  //overflow: auto;
+  padding: 0 20% 0 20%;
+  overflow: hidden;
 
   max-width: 800px;
+
+  @media (min-width: 1200px) {
+    max-width: 1080px;
+  }
 
   div {
     display: flex;
@@ -210,15 +238,29 @@ body {
     width: 60%;
     .date-column {
       font-size: 0.5em;
+
+      .date {
+        font-size: 6em;
+      }
+
+      .year, .month {
+        font-size: 2em;
+      }
+
+      .day, .time {
+        font-size: 2em;
+      }
+
     }
   }
+  
   .date-column:nth-of-type(2) {
     width: 20%;
   }
 }
 
 .welcome {
-  padding: 5em 0 5em 0;
+  padding: 2.5% 0 2.5% 0;
 
   //background-image: url("../images/border 2.png");
   //background-repeat: no-repeat;
@@ -254,6 +296,10 @@ body {
     width: 100%;
     border: $frameColour solid 2em;
     box-sizing: border-box;
+
+    @media (min-width: 1200px) {
+      border: $frameColour solid 1em;
+    }
   }
 
   .title-words {
@@ -272,6 +318,10 @@ body {
   height: 20%;
   width: 80%;
   max-width: 800px;
+
+  @media (min-width: 1200px) {
+    max-width: 1080px;
+  }
 
   p {
     font-size: 4em;
@@ -336,7 +386,6 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: space-evenly;
-
     width: 100%;
   }
 
@@ -361,11 +410,12 @@ body {
     color: $secondaryColour;
   }
 
-  p, a, label {
+  p, label, input {
     font-size: 1.75em;
     font-family: $primaryFont;
     text-align: center;
     margin: 0.5em;
+    overflow: hidden;
   }
 
   .bold-var {
@@ -414,7 +464,8 @@ body {
 
     input {
       color: $primaryColour;
-      height: 20px;
+      height: 0.75em;
+      width: 0.75em;
     }
 
   }
@@ -423,9 +474,9 @@ body {
 
     font-size: 0.75em;
 
-    //p, a, label {
-    //  font-size: 0.75em;
-    //}
+    p, label, input {
+      font-size: 1.25em;
+    }
 
     .bold-var {
       font-size: 1.25em;
@@ -435,11 +486,32 @@ body {
       height: 4em;
     }
   }
+  @media (min-width: 1200px) {
+    font-size: 1.25em;
+
+    p, label, input {
+      font-size: 2.25em;
+    }
+  }
 }
 
 .rsvp {
   display: flex;
   flex-direction: column;
+
+  #submit {
+    padding: 0.25em 1.5em 0.25em 1.5em;
+    background-color: $frameColour;
+    border: $frameColour 2px solid;
+    border-radius: 2em;
+    color: white;
+    margin: 1em 0.5em 0 0.5em;
+  }
+
+  #submit:hover {
+    background-color: white;
+    color: $frameColour;
+  }
 }
 
 @media (max-width: 800px) {
