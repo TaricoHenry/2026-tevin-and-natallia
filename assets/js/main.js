@@ -40,9 +40,11 @@ animElements.forEach(el => observer.observe(el))
 //END fade in code
 
 async function checkToken() {
-    const token = (window.location.pathname);
+    let params = new URLSearchParams(document.location.search);
+    let token = params.get("token");
     console.log(token);
-    var url = ('https://us-central1-ash-wedding.cloudfunctions.net:443/v1/token/'+token+'/status');
+    var url = ('https://us-central1-tevin-wedding.cloudfunctions.net:443/api/v1/token/'+token+'/status');
+
     try {
         const response = await fetch(url, {
                 method: "GET",
