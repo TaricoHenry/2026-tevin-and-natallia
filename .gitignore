@@ -10,3 +10,7 @@ csv/guestList.csv
 serviceAccountKey.json
 .DS_Store
 firebase/.firebase/hosting.YWRtaW4tZGFzaGJvYXJkL2Rpc3Q.cache
+expected_firestore_export.csv
+import_warnings.csv
+csv/guestList.preview.csv
+csv/guestList.warnings.csv
