@@ -39,15 +39,6 @@ animElements.forEach(el => observer.observe(el))
 
 //END fade in code
 
-//START checkbox code
-
-function checked() {
-    var box = window.event.target;
-    console.log(box);
-}
-
-//END checkbox code
-
 async function checkToken() {
     const token = (window.location.pathname);
     console.log(token);
@@ -64,3 +55,66 @@ async function checkToken() {
         console.error(error.message);
     }
 }
+
+const sampleResponse = {
+    "isSuccess": true,
+    "token": "AB12CD",
+    "household": "The Smith Family",
+    "householdSize": 2,
+    "allResponded": false,
+    "members": [
+        {
+            "memberId":"abc123",
+            "name":"personA Smith",
+            "personalizedAddy":"Mr personA",
+            "rsvp":false,
+            "respondedAt":"11:59"
+        },
+        {
+            "memberId":"abc124",
+            "name":"personB Smith",
+            "personalizedAddy":"Mr personB",
+            "rsvp":false,
+            "respondedAt":"11:59"
+        }
+        
+    ]
+}
+
+//START Parse JSON Code
+
+var guestBoxes = ""
+
+for ( i of sampleResponse.members) {
+    guestBoxes = guestBoxes + 
+    `            
+        <div class="guest-box">
+            <label for="${i.memberId}">
+                ${i.personalizedAddy}
+            </label>
+            <input id="${i.memberId}" class="guest-checkbox" type="checkbox"/>
+        </div>
+    `
+}
+
+document.getElementsByClassName("rsvp")[0].innerHTML =
+    `
+    <p>Kindly let us know who will be attending:</p>
+    </br>
+    </br>
+    ${guestBoxes}
+    <input id="submit" type="button" value="Submit" onclick="checkToken()">
+    `;
+
+//END Parse JSON Code
+
+//START checkbox code
+
+const checkboxes = document.getElementsByClassName("guest-checkbox");
+for (i of checkboxes) {
+    i.addEventListener("click", (event) => {
+        event.target.parentNode.classList.toggle("toggled");
+    });
+}
+
+//END checkbox code

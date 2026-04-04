@@ -8,6 +8,7 @@ $tertiaryColour: #7c7474;
 $frameColour: #5A6B3C;
 $primaryFont: "Glowgirl";
 $secondaryFont: "Montserrat";
+$tertiaryFont: "Beau Rivage";
 $clockFont: "DM Serif Display";
 
 html {
@@ -468,6 +469,13 @@ body {
       width: 0.75em;
     }
 
+  }
+
+  .toggled {
+    background-color: $frameColour;
+    label {
+      color: white ;
+    }
   }
 
   @media (max-width: 800px) {
