@@ -90,7 +90,7 @@ const adminHouseholdRequest = Joi.object({
 const apiVersion = "/v1";
 
 //declaring global to store base page redirect url
-const defaultPageUrl = "https://tevinandnatalie.com/";
+const defaultPageUrl = "https://tevinandnatallia.com/";
 
 // ===================================
 // Admin config
@@ -141,7 +141,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
-  "https://tevinandnatalie.com",
+  "https://tevinandnatallia.com",
   "https://tevin-wedding.web.app",
 ];
 
@@ -236,7 +236,7 @@ export const validateRequest = (schema, property = "body") => {
 
 // Build a full RSVP URL from a 6 character code
 function buildUniqueUrl(code) {
-  return `https://tevinandnatalie.com/${code}`;
+  return `https://tevinandnatallia.com/?token=${code}`;
 }
 
 // Normalize code to 6 uppercase alphanumeric characters

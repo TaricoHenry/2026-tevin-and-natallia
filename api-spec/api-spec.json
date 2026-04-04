@@ -124,7 +124,7 @@
           "uniqueUrl": {
             "type": "string",
             "format": "uri",
-            "example": "https://tevinandnatalie.com/AB12CD"
+            "example": "https://tevinandnatallia.com/?token=AB12CD"
           },
           "household": {
             "type": "string",
@@ -212,7 +212,7 @@
           "url": {
             "type": "string",
             "format": "uri",
-            "example": "https://tevinandnatalie.com/"
+            "example": "https://tevinandnatallia.com/"
           }
         },
         "required": ["isSuccess", "token", "valid", "used", "message", "url"]
@@ -369,7 +369,7 @@
           "url": {
             "type": "string",
             "format": "uri",
-            "example": "https://tevinandnatalie.com/"
+            "example": "https://tevinandnatallia.com/"
           }
         },
         "required": ["isSuccess", "token", "valid", "used", "message", "url"]

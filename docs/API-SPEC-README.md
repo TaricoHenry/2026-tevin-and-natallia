@@ -212,7 +212,7 @@ None
   "valid": true,
   "used": true,
   "message": "All household members have already responded",
-  "url": "https://tevinandnatalie.com/"
+  "url": "https://tevinandnatallia.com/"
 }
 ```
 
@@ -383,7 +383,7 @@ None
   "valid": true,
   "used": true,
   "message": "All household members have already responded",
-  "url": "https://tevinandnatalie.com/"
+  "url": "https://tevinandnatallia.com/"
 }
 ```
 
@@ -528,7 +528,7 @@ Required
   "households": [
     {
       "code": "AB12CD",
-      "uniqueUrl": "https://tevinandnatalie.com/AB12CD",
+      "uniqueUrl": "https://tevinandnatallia.com/?token=AB12CD",
       "household": "The Smith Family",
       "householdSize": 2,
       "allResponded": false,
