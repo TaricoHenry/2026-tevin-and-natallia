@@ -3,3 +3,10 @@ _site
 .jekyll-cache
 .jekyll-metadata
 vendor
+serviceAccountKey-DO NOT USE.json
+firebase-debug.log
+firebase/firestore-debug.log
+csv/guestList.csv
+serviceAccountKey.json
+.DS_Store
+firebase/.firebase/hosting.YWRtaW4tZGFzaGJvYXJkL2Rpc3Q.cache

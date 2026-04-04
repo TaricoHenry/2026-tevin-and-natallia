@@ -1,0 +1,570 @@
+#%RAML 1.0
+title: Wedding RSVP Admin + Public API
+version: v1
+baseUri: /
+mediaType: application/json
+protocols: [ HTTPS, HTTP ]
+
+documentation:
+  - title: Overview
+    content: |
+      RAML spec generated from the current index.js implementation.
+
+      Public endpoints:
+      - /v1/ready
+      - /v1/token/{token}/status
+      - /v1/token/{token}
+      - /v1/token/{token}/reply
+
+      Admin endpoints:
+      - /v1/admin/login
+      - /v1/admin/logout
+      - /v1/admin/households
+      - /v1/admin/households/{code}
+
+      Admin authentication uses an HTTP-only cookie named __session.
+
+types:
+  ErrorResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      message: string
+    example:
+      isSuccess: false
+      message: Internal server error
+
+  ValidationErrorItem:
+    type: object
+    properties:
+      path: string
+      message: string
+    example:
+      path: responses.0.rsvp
+      message: rsvp value can only be yes or no
+
+  ValidationErrorResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      message: string
+      errors: ValidationErrorItem[]
+    example:
+      isSuccess: false
+      message: Validation error
+      errors:
+        - path: responses.0.rsvp
+          message: rsvp value can only be yes or no
+
+  Member:
+    type: object
+    properties:
+      memberId: string
+      name: string
+      personalizedAddy?: string | nil
+      rsvp?: string | nil
+      respondedAt?: datetime | nil
+    example:
+      memberId: AB12CD_1
+      name: John Smith
+      personalizedAddy: Mr. John
+      rsvp: yes
+      respondedAt: 2026-04-02T12:00:00.000Z
+
+  Household:
+    type: object
+    properties:
+      code: string
+      uniqueUrl: string
+      household: string
+      householdSize: integer
+      allResponded: boolean
+      respondedAt?: datetime | nil
+      members: Member[]
+      createdAt?:
+      updatedAt?:
+    example:
+      code: AB12CD
+      uniqueUrl: https://tevinandnatalie.com/AB12CD
+      household: The Smith Family
+      householdSize: 2
+      allResponded: false
+      respondedAt: null
+      members:
+        - memberId: AB12CD_1
+          name: John Smith
+          personalizedAddy: Mr. John
+          rsvp: null
+          respondedAt: null
+        - memberId: AB12CD_2
+          name: Jane Smith
+          personalizedAddy: Mrs. Jane
+          rsvp: yes
+          respondedAt: 2026-04-02T12:00:00.000Z
+
+  TokenStatusSuccessUnused:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      valid: boolean
+      used: boolean
+      message: string
+    example:
+      isSuccess: true
+      token: AB12CD
+      valid: true
+      used: false
+      message: Token is valid
+
+  TokenStatusSuccessUsed:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      valid: boolean
+      used: boolean
+      message: string
+      url: string
+    example:
+      isSuccess: true
+      token: AB12CD
+      valid: true
+      used: true
+      message: All household members have already responded
+      url: https://tevinandnatalie.com/
+
+  TokenStatusNotFound:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      valid: boolean
+      used: boolean
+      message: string
+    example:
+      isSuccess: false
+      token: BAD123
+      valid: false
+      used: false
+      message: Guest does not exist
+
+  GetTokenSuccess:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      household: string
+      householdSize: integer
+      allResponded: boolean
+      members: Member[]
+    example:
+      isSuccess: true
+      token: AB12CD
+      household: The Smith Family
+      householdSize: 2
+      allResponded: false
+      members:
+        - memberId: AB12CD_1
+          name: John Smith
+          personalizedAddy: Mr. John
+          rsvp: null
+        - memberId: AB12CD_2
+          name: Jane Smith
+          personalizedAddy: Mrs. Jane
+          rsvp: null
+
+  GetTokenNotFound:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      message: string
+    example:
+      isSuccess: false
+      token: BAD123
+      message: guest does not exist
+
+  RsvpResponseItem:
+    type: object
+    properties:
+      memberId: string
+      rsvp:
+        type: string
+        enum: [ yes, no ]
+    example:
+      memberId: AB12CD_1
+      rsvp: yes
+
+  RsvpRequest:
+    type: object
+    properties:
+      responses:
+        type: RsvpResponseItem[]
+        minItems: 1
+    example:
+      responses:
+        - memberId: AB12CD_1
+          rsvp: yes
+        - memberId: AB12CD_2
+          rsvp: no
+
+  RsvpSuccess:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      allResponded: boolean
+      message: string
+    example:
+      isSuccess: true
+      token: AB12CD
+      allResponded: true
+      message: RSVP responses recorded successfully
+
+  RsvpUsedConflict:
+    type: object
+    properties:
+      isSuccess: boolean
+      token: string
+      valid: boolean
+      used: boolean
+      message: string
+      url: string
+    example:
+      isSuccess: true
+      token: AB12CD
+      valid: true
+      used: true
+      message: All household members have already responded
+      url: https://tevinandnatalie.com/
+
+  AdminLoginRequest:
+    type: object
+    properties:
+      username: string
+      password: string
+    example:
+      username: clientadmin
+      password: your-password
+
+  AdminMessageResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      message: string
+    example:
+      isSuccess: true
+      message: Login successful
+
+  AdminHouseholdMemberInput:
+    type: object
+    properties:
+      name: string
+      personalizedAddy?: string | nil
+      rsvp?:
+        type: string | nil
+        enum: [ yes, no ]
+    example:
+      name: John Smith
+      personalizedAddy: Mr. John
+      rsvp: yes
+
+  AdminHouseholdRequest:
+    type: object
+    properties:
+      household: string
+      householdSize:
+        type: integer
+        minimum: 1
+      members:
+        type: AdminHouseholdMemberInput[]
+        minItems: 1
+    example:
+      household: The Smith Family
+      householdSize: 2
+      members:
+        - name: John Smith
+          personalizedAddy: Mr. John
+          rsvp: null
+        - name: Jane Smith
+          personalizedAddy: Mrs. Jane
+          rsvp: null
+
+  AdminListHouseholdsResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      households: Household[]
+    example:
+      isSuccess: true
+      households:
+        - code: AB12CD
+          uniqueUrl: https://tevinandnatalie.com/AB12CD
+          household: The Smith Family
+          householdSize: 2
+          allResponded: false
+          members:
+            - memberId: AB12CD_1
+              name: John Smith
+              personalizedAddy: Mr. John
+              rsvp: null
+            - memberId: AB12CD_2
+              name: Jane Smith
+              personalizedAddy: Mrs. Jane
+              rsvp: yes
+
+  UnauthorizedResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      message: string
+    example:
+      isSuccess: false
+      message: Unauthorized
+
+  InvalidCredentialsResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      message: string
+    example:
+      isSuccess: false
+      message: Invalid credentials
+
+  HouseholdNotFoundResponse:
+    type: object
+    properties:
+      isSuccess: boolean
+      message: string
+    example:
+      isSuccess: false
+      message: Household not found
+
+/v1:
+  /ready:
+    get:
+      description: Health check endpoint.
+      responses:
+        200:
+          body:
+            application/json:
+              type: AdminMessageResponse
+              example:
+                isSuccess: true
+                message: API is ready to accept requests
+
+  /token:
+    /{token}:
+      uriParameters:
+        token:
+          type: string
+          description: Household code
+
+      get:
+        description: Returns the household record for a valid token.
+        responses:
+          200:
+            body:
+              application/json:
+                type: GetTokenSuccess
+          404:
+            body:
+              application/json:
+                type: GetTokenNotFound
+          500:
+            body:
+              application/json:
+                type: ErrorResponse
+
+      /status:
+        get:
+          description: |
+            Checks whether a token exists, is valid, and has already been fully used.
+            A token is considered used only when all household members have responded.
+          responses:
+            200:
+              body:
+                application/json:
+                  type: TokenStatusSuccessUnused | TokenStatusSuccessUsed
+            404:
+              body:
+                application/json:
+                  type: TokenStatusNotFound
+            500:
+              body:
+                application/json:
+                  type: ErrorResponse
+
+      /reply:
+        post:
+          description: |
+            Submits RSVP responses for one or more members in a household.
+            Members are updated by memberId.
+          body:
+            application/json:
+              type: RsvpRequest
+          responses:
+            200:
+              body:
+                application/json:
+                  type: RsvpSuccess
+            400:
+              body:
+                application/json:
+                  type: ValidationErrorResponse
+            404:
+              body:
+                application/json:
+                  type: TokenStatusNotFound
+            409:
+              body:
+                application/json:
+                  type: RsvpUsedConflict
+            500:
+              body:
+                application/json:
+                  type: ErrorResponse
+
+  /admin:
+    /login:
+      post:
+        description: Authenticates an admin and sets the __session cookie.
+        body:
+          application/json:
+            type: AdminLoginRequest
+        responses:
+          200:
+            headers:
+              Set-Cookie:
+                description: HTTP-only admin session cookie
+                type: string
+            body:
+              application/json:
+                type: AdminMessageResponse
+                example:
+                  isSuccess: true
+                  message: Login successful
+          400:
+            body:
+              application/json:
+                type: ValidationErrorResponse
+          401:
+            body:
+              application/json:
+                type: InvalidCredentialsResponse
+          500:
+            body:
+              application/json:
+                type: ErrorResponse
+
+    /logout:
+      post:
+        description: Clears the admin session cookie.
+        responses:
+          200:
+            body:
+              application/json:
+                type: AdminMessageResponse
+                example:
+                  isSuccess: true
+                  message: Logout successful
+
+    /households:
+      get:
+        description: Returns all household documents for the admin dashboard.
+        headers:
+          Cookie:
+            type: string
+            required: true
+            description: Must include __session cookie
+        responses:
+          200:
+            body:
+              application/json:
+                type: AdminListHouseholdsResponse
+          401:
+            body:
+              application/json:
+                type: UnauthorizedResponse
+          500:
+            body:
+              application/json:
+                type: ErrorResponse
+
+      post:
+        description: |
+          Creates a new household.
+          The backend generates code, uniqueUrl, and memberId values.
+        headers:
+          Cookie:
+            type: string
+            required: true
+            description: Must include __session cookie
+        body:
+          application/json:
+            type: AdminHouseholdRequest
+        responses:
+          201:
+            body:
+              application/json:
+                type: AdminMessageResponse
+                example:
+                  isSuccess: true
+                  message: Household created successfully
+          400:
+            body:
+              application/json:
+                type: ValidationErrorResponse
+          401:
+            body:
+              application/json:
+                type: UnauthorizedResponse
+          500:
+            body:
+              application/json:
+                type: ErrorResponse
+
+      /{code}:
+        uriParameters:
+          code:
+            type: string
+            description: Existing household code
+
+        put:
+          description: |
+            Updates an existing household.
+            Household code and uniqueUrl remain immutable.
+            Existing memberId values are preserved by the backend.
+          headers:
+            Cookie:
+              type: string
+              required: true
+              description: Must include __session cookie
+          body:
+            application/json:
+              type: AdminHouseholdRequest
+          responses:
+            200:
+              body:
+                application/json:
+                  type: AdminMessageResponse
+                  example:
+                    isSuccess: true
+                    message: Household updated successfully
+            400:
+              body:
+                application/json:
+                  type: ValidationErrorResponse
+            401:
+              body:
+                application/json:
+                  type: UnauthorizedResponse
+            404:
+              body:
+                application/json:
+                  type: HouseholdNotFoundResponse
+            500:
+              body:
+                application/json:
+                  type: ErrorResponse
