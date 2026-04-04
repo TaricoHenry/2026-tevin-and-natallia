@@ -491,9 +491,6 @@ export default function AdminDashboard() {
         <div style={styles.tableCard}>
           <div style={styles.tableHeader}>
             <div style={styles.tableTitle}>Household records</div>
-            <div style={styles.tableSubtleText}>
-              Spreadsheet-style view for easy client editing
-            </div>
           </div>
 
           <div style={styles.tableWrap}>
