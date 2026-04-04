@@ -49,10 +49,12 @@ function checked() {
 //END checkbox code
 
 async function checkToken() {
-    url = ('https://us-central1-ash-wedding.cloudfunctions.net:443/api/v1/token/EXRRQC/status')
+    const token = (window.location.pathname);
+    console.log(token);
+    var url = ('https://us-central1-ash-wedding.cloudfunctions.net:443/v1/token/'+token+'/status');
     try {
         const response = await fetch(url, {
-                method: "POST",
+                method: "GET",
                 headers: {
                     "Content-Type": "application/json",
                 }
