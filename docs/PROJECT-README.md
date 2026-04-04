@@ -202,7 +202,7 @@ Each document represents one household.
 ```json
 {
   "code": "AB12CD",
-  "uniqueUrl": "https://tevinandnatalie.com/AB12CD",
+  "uniqueUrl": "https://tevinandnatallia.com/?token=AB12CD",
   "household": "The Smith Family",
   "householdSize": 3,
   "allResponded": false,
@@ -274,7 +274,7 @@ Rules:
 * format:
 
 ```text
-https://tevinandnatalie.com/{CODE}
+https://tevinandnatallia.com/?token={CODE}
 ```
 
 * immutable after creation

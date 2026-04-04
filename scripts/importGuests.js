@@ -51,7 +51,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const COLLECTION_NAME = "InvitedGuests";
-const BASE_URL = "https://tevinandnatalie.com";
+const BASE_URL = "https://tevinandnatallia.com";
 
 // ======================================================
 // Helpers
@@ -283,7 +283,7 @@ while (i < records.length) {
 
     const household = {
       code,
-      uniqueUrl: `${BASE_URL}/${code}`,
+      uniqueUrl: `${BASE_URL}/?token=${code}`,
       household: householdName || name || `Household ${code}`,
       householdSize,
       allResponded: false,
@@ -373,7 +373,7 @@ while (i < records.length) {
 
     households.set(groupingKey, {
       code,
-      uniqueUrl: `${BASE_URL}/${code}`,
+      uniqueUrl: `${BASE_URL}/?token=${code}`,
       household: householdName || name,
       householdSize: 1,
       allResponded: false,
