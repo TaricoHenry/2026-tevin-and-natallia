@@ -4,9 +4,38 @@
     align-items: center;
     justify-content: center;
     flex-direction: column;
+    .content {
+    display: flex;
+    align-items: center;
+    justify-content: center; 
+    flex-direction: column;
+    height: 100%;
+    }
     h1 {
-      font-size: 6em;
+      font-family: $tertiaryFont;
+      font-size: 8em;
+      line-height: 1em;
       margin: 0;
       text-align: center;
+    }
+    h2 {
+      font-size: 6em;
+      font-family: $primaryFont;
+      margin: 0;
+      padding: 0;
+    }
+    p {
+      font-family: $primaryFont;
+      text-align: center;
+      font-size: 2em;
+      line-height: 1.5em;
+    }
+    @media (max-width: 800px) {
+      h1 {
+        font-size: 5em;
+      }
+      p {
+        font-size: 1em;
+      }
     }
   }
