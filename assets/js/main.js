@@ -3,10 +3,17 @@ let params = new URLSearchParams(document.location.search);
 const token = params.get("token");
 
 window.onload = startLoad();
-window.onload = checkTokenStatus();
 
 function startLoad() {
-  show = setTimeout(showPage, 1000);
+    const submit =  document.getElementById("submit")
+    if (submit) {
+        show = setTimeout(showPage, 2000);
+        checkTokenStatus();
+        }
+    const redirect = document.getElementById("redirect")
+    if (redirect) {
+        redirect.href = "/?token="+token;
+    }
 }
 
 function showPage() {
@@ -14,6 +21,7 @@ function showPage() {
   document.getElementsByClassName("story")[0].style.display = "flex";
   document.getElementsByClassName("invitation")[0].style.display = "flex";
 }
+
 
 
 var countDownDate = new Date("Jul 25, 2026 14:00:00").getTime();
@@ -155,13 +163,7 @@ async function populateTokenData() {
     }
 }
 
-
 //END Populate Token Code
-
-//START checkbox code
-
-
-//END checkbox code
 
 //START Submit Code
 
@@ -187,7 +189,7 @@ async function submitResponse() {
         const result = await response.json();
         console.log(result);
         setTimeout(() => {
-            window.location.replace("/thank-you");
+            window.location.replace("/thank-you?token="+token);
         }, 1500);
 
     }
