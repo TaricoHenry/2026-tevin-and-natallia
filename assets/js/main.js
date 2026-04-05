@@ -81,6 +81,19 @@ async function checkTokenStatus() {
         else if (tokenStatusBody.used == false && tokenStatusBody.valid == true) {
             populateTokenData();
         }
+        else if (tokenStatusBody.used == true && tokenStatusBody.valid == true) {
+            // this says if the token is used, retrieve it anyway. It renders it like normal, but after populateTokenData() it disables all the buttons and inputs.
+            let res = await populateTokenData();
+            document.getElementsByClassName("rsvp")[0].classList.add("disabled")
+            let button = document.getElementById("submit")
+            button.value = "Submitted";
+            button.disabled = true;
+            let checkboxes = document.getElementsByClassName("guest-checkbox")
+            for (i of checkboxes) {
+                i.disabled = true;
+            }
+
+        }
 
     } catch (error) {
         console.error(error.message);
@@ -107,13 +120,15 @@ async function populateTokenData() {
         var guestBoxes = "";
 
         for ( i of tokenDetailsBody.members) {
+            let checkedStatus =  i.rsvp == "yes" ? "checked" : "";
+            let boxStatus = i.rsvp == "yes" ? "toggled" : "";
             guestBoxes = guestBoxes + 
             `            
-                <div class="guest-box">
+                <div class="guest-box ${boxStatus}">
                     <label for="${i.memberId}">
                         ${i.personalizedAddy}
                     </label>
-                    <input id="${i.memberId}" class="guest-checkbox" type="checkbox"/>
+                    <input id="${i.memberId}" class="guest-checkbox" type="checkbox" ${checkedStatus}/>
                 </div>
             `
         }
@@ -132,6 +147,12 @@ async function populateTokenData() {
     } catch (error) {
         console.error(error.message);
     }
+    const checkboxes = document.getElementsByClassName("guest-checkbox");
+    for (i of checkboxes) {
+        i.addEventListener("click", (event) => {
+            event.target.parentNode.classList.toggle("toggled");
+        });
+    }
 }
 
 
@@ -139,12 +160,6 @@ async function populateTokenData() {
 
 //START checkbox code
 
-const checkboxes = document.getElementsByClassName("guest-checkbox");
-for (i of checkboxes) {
-    i.addEventListener("click", (event) => {
-        event.target.parentNode.classList.toggle("toggled");
-    });
-}
 
 //END checkbox code
 

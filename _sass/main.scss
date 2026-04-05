@@ -37,8 +37,8 @@ body {
     color: $primaryColour;
     text-align: left;
     font-size: 9.5vw;
-    margin: 0 0 0 0.5em;
-    line-height: 1em;
+    margin: 0 0 0 0.25em;
+    line-height: 0.8em;
   }
 
   p, label {
@@ -279,6 +279,12 @@ body {
   height: auto;
 
   min-height: 100vh;
+
+  h1 {
+    font-family: $tertiaryFont;
+    font-size: 12em;
+    letter-spacing: -0.045em;
+  }
 
 
   .pillar-flower {
@@ -539,6 +545,19 @@ body {
   #submit:hover {
     background-color: white;
     color: $frameColour;
+  }
+}
+
+.disabled {
+  .guest-box {
+    border-left: grey solid 1em;
+  }
+  .toggled {
+    background-color: grey;
+  }
+  #submit, #submit:hover {
+    background-color: grey;
+    border: grey 2px solid;
   }
 }
 
