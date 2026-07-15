@@ -1,0 +1,29 @@
+---
+layout: default
+title: "Gallery - Tevin & Natallia"
+---
+
+<div class="gallery-container">
+    <div class="gallery-header">
+        <h2>Our Journey</h2>
+        <p>A collection of moments from our engagement and preparations</p>
+    </div>
+
+    <div class="gallery-loading" id="galleryLoading">
+        <p>Loading gallery...</p>
+    </div>
+
+    <div class="gallery-error" id="galleryError" style="display: none;">
+        <p>Unable to load images. Please try again later.</p>
+    </div>
+
+    <div class="gallery-empty" id="galleryEmpty" style="display: none;">
+        <p>No photos have been added yet.</p>
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid">
+        <!-- Images will be loaded here -->
+    </div>
+</div>
+
+<script src="{{ '/assets/js/gallery.js' | relative_url }}"></script>

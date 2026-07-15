@@ -1,0 +1,74 @@
+---
+layout: default
+title: "Share Photos - Tevin & Natallia"
+permalink: /gallery-upload/
+---
+
+<div class="gallery-container gallery-upload-container">
+    <div class="gallery-header">
+        <h2>Share Your Photos</h2>
+        <p>Upload your favorite moments from the celebration. Photos will be reviewed before appearing in the public gallery.</p>
+    </div>
+
+    <div class="gallery-upload-card">
+        <form id="galleryUploadForm" class="gallery-upload-form" data-album="guest" novalidate>
+            <div class="gallery-upload-field">
+                <label for="galleryUploadName">Your name</label>
+                <input
+                    id="galleryUploadName"
+                    class="gallery-upload-input"
+                    type="text"
+                    name="guestName"
+                    autocomplete="name"
+                    placeholder="Optional"
+                >
+            </div>
+
+            <div class="gallery-upload-field">
+                <label for="galleryUploadFile">Choose photo(s)</label>
+                <input
+                    id="galleryUploadFile"
+                    class="gallery-upload-input gallery-upload-file-input"
+                    type="file"
+                    name="photos"
+                    accept="image/*"
+                    multiple
+                    required
+                >
+                <p class="gallery-upload-help">You can select more than one photo. Large files may take a moment to upload.</p>
+            </div>
+
+            <details class="gallery-upload-details">
+                <summary>Have an invite code?</summary>
+                <div class="gallery-upload-field gallery-upload-field--nested">
+                    <label for="galleryUploadInviteCode">Invite code</label>
+                    <input
+                        id="galleryUploadInviteCode"
+                        class="gallery-upload-input"
+                        type="text"
+                        name="inviteCode"
+                        inputmode="text"
+                        autocomplete="off"
+                        placeholder="Optional"
+                    >
+                    <p class="gallery-upload-help">Leave this blank for the general wedding upload page.</p>
+                </div>
+            </details>
+
+            <div id="galleryUploadPreview" class="gallery-upload-preview" aria-live="polite"></div>
+
+            <div id="galleryUploadStatus" class="gallery-upload-status" role="status" aria-live="polite"></div>
+
+            <button id="galleryUploadButton" class="gallery-upload-button" type="submit">
+                Upload photo(s)
+            </button>
+        </form>
+    </div>
+
+    <div class="gallery-upload-aftercare">
+        <p>Thank you for sharing your memories with us. Approved photos may appear on the gallery page later.</p>
+        <a href="{{ '/gallery/' | relative_url }}">View the gallery</a>
+    </div>
+</div>
+
+<script src="{{ '/assets/js/gallery.js' | relative_url }}"></script>

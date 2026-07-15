@@ -26,6 +26,13 @@ const emptyGuest = {
   members: [{ memberId: "", name: "", personalizedAddy: "", rsvp: null }],
 };
 
+const emptyPhotoUpload = {
+  files: [],
+  altText: "",
+  album: "ceremony",
+  approved: true,
+};
+
 // ===================================
 // CSV VALUE ESCAPER
 // ===================================
@@ -38,8 +45,61 @@ function csvEscape(value) {
   return stringValue;
 }
 
+function formatDateTime(value) {
+  if (!value) return "";
+
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value);
+  }
+}
+
+function inferImageContentType(file) {
+  if (file?.type) return file.type;
+
+  const name = String(file?.name || "").toLowerCase();
+
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".gif")) return "image/gif";
+  if (name.endsWith(".heic")) return "image/heic";
+  if (name.endsWith(".heif")) return "image/heif";
+
+  return "application/octet-stream";
+}
+
+function readImageDimensions(file) {
+  return new Promise((resolve) => {
+    if (!file || !file.type?.startsWith("image/")) {
+      resolve({ width: null, height: null });
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      const dimensions = {
+        width: image.naturalWidth || null,
+        height: image.naturalHeight || null,
+      };
+      URL.revokeObjectURL(objectUrl);
+      resolve(dimensions);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ width: null, height: null });
+    };
+
+    image.src = objectUrl;
+  });
+}
+
 // ===================================
-// STATUS BADGE
+// STATUS BADGES
 // ===================================
 // Displays either a complete badge or a progress badge for each household.
 function StatusText({ row }) {
@@ -53,6 +113,18 @@ function StatusText({ row }) {
   const total = (row.members || []).length;
 
   return <span style={styles.pending}>{responded}/{total} replied</span>;
+}
+
+function PhotoStatusText({ photo }) {
+  if (photo.uploadStatus === "pending_upload") {
+    return <span style={styles.pending}>Upload pending</span>;
+  }
+
+  if (photo.approved) {
+    return <span style={styles.complete}>Approved</span>;
+  }
+
+  return <span style={styles.pending}>Needs review</span>;
 }
 
 // ===================================
@@ -100,6 +172,15 @@ export default function AdminDashboard() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [draft, setDraft] = useState(emptyGuest);
 
+  const [activeTab, setActiveTab] = useState("households");
+  const [photos, setPhotos] = useState([]);
+  const [photoSearch, setPhotoSearch] = useState("");
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUploadProgress, setPhotoUploadProgress] = useState("");
+  const [photoUpload, setPhotoUpload] = useState(emptyPhotoUpload);
+  const [photoInputKey, setPhotoInputKey] = useState(0);
+
   // ===================================
   // FILTERED HOUSEHOLDS
   // ===================================
@@ -121,6 +202,27 @@ export default function AdminDashboard() {
     });
   }, [rows, search]);
 
+  const filteredPhotos = useMemo(() => {
+    const q = photoSearch.trim().toLowerCase();
+    if (!q) return photos;
+
+    return photos.filter((photo) => {
+      return [
+        photo.id,
+        photo.altText,
+        photo.album,
+        photo.uploaderType,
+        photo.inviteCode,
+        photo.guestName,
+        photo.uploadStatus,
+        photo.approved ? "approved" : "pending",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [photos, photoSearch]);
+
   // ===================================
   // SUMMARY COUNTS
   // ===================================
@@ -138,6 +240,12 @@ export default function AdminDashboard() {
 
     return sum + respondedCount;
   }, 0);
+
+  const approvedPhotos = photos.filter((photo) => photo.approved).length;
+  const pendingReviewPhotos = photos.filter((photo) => !photo.approved).length;
+  const guestUploadedPhotos = photos.filter(
+    (photo) => photo.uploaderType === "guest"
+  ).length;
 
   // ===================================
   // LOAD HOUSEHOLDS
@@ -160,6 +268,32 @@ export default function AdminDashboard() {
     }
   }
 
+  async function loadPhotos() {
+    setPhotoLoading(true);
+    setError("");
+
+    try {
+      const data = await api("/photos");
+      setPhotos(data.photos || []);
+    } catch (err) {
+      setError(err.message);
+      if (err.message === "Unauthorized") {
+        setIsAuthed(false);
+      }
+    } finally {
+      setPhotoLoading(false);
+    }
+  }
+
+  async function refreshCurrentTab() {
+    if (activeTab === "photos") {
+      await loadPhotos();
+      return;
+    }
+
+    await loadRows();
+  }
+
   // ===================================
   // LOAD DATA AFTER LOGIN
   // ===================================
@@ -167,6 +301,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (isAuthed) {
       loadRows();
+      loadPhotos();
     }
   }, [isAuthed]);
 
@@ -204,6 +339,7 @@ export default function AdminDashboard() {
 
     setIsAuthed(false);
     setRows([]);
+    setPhotos([]);
     setUsername("");
     setPassword("");
   }
@@ -241,6 +377,10 @@ export default function AdminDashboard() {
       members[index] = { ...members[index], [key]: value };
       return { ...prev, members };
     });
+  }
+
+  function updatePhotoUploadField(key, value) {
+    setPhotoUpload((prev) => ({ ...prev, [key]: value }));
   }
 
   // ===================================
@@ -309,6 +449,143 @@ export default function AdminDashboard() {
     }
   }
 
+  async function uploadOneAdminPhoto(file, index, total) {
+    const contentType = inferImageContentType(file);
+
+    if (!contentType.startsWith("image/")) {
+      throw new Error(`${file.name} is not a supported image file.`);
+    }
+
+    const dimensions = await readImageDimensions(file);
+    const altText = photoUpload.altText
+      ? `${photoUpload.altText}${total > 1 ? ` ${index + 1}` : ""}`
+      : file.name;
+
+    setPhotoUploadProgress(`Preparing ${index + 1} of ${total}: ${file.name}`);
+
+    const session = await api("/photos/upload-url", {
+      method: "POST",
+      body: JSON.stringify({
+        fileName: file.name,
+        contentType,
+        altText,
+        album: photoUpload.album || "general",
+        sizeBytes: file.size,
+        width: dimensions.width,
+        height: dimensions.height,
+        approved: photoUpload.approved,
+        createThumbnail: false,
+      }),
+    });
+
+    if (!session.upload?.url) {
+      throw new Error(`Upload URL was not returned for ${file.name}.`);
+    }
+
+    setPhotoUploadProgress(`Uploading ${index + 1} of ${total}: ${file.name}`);
+
+    const uploadResponse = await fetch(session.upload.url, {
+      method: session.upload.method || "PUT",
+      headers: session.upload.requiredHeaders || {
+        "Content-Type": contentType,
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const uploadText = await uploadResponse.text().catch(() => "");
+      throw new Error(
+        uploadText || `Cloudflare R2 upload failed for ${file.name} with ${uploadResponse.status}`
+      );
+    }
+
+    setPhotoUploadProgress(`Finishing ${index + 1} of ${total}: ${file.name}`);
+
+    await api(`/photos/${session.photoId}/complete`, {
+      method: "POST",
+      body: JSON.stringify({
+        thumbUploaded: false,
+        approved: photoUpload.approved,
+        sizeBytes: file.size,
+        width: dimensions.width,
+        height: dimensions.height,
+      }),
+    });
+
+    return session.photoId;
+  }
+
+  async function uploadAdminPhoto(e) {
+    e.preventDefault();
+    setError("");
+    setInfo("");
+    setPhotoUploadProgress("");
+
+    const files = Array.from(photoUpload.files || []);
+
+    if (!files.length) {
+      setError("Choose at least one image before uploading.");
+      return;
+    }
+
+    setPhotoUploading(true);
+
+    try {
+      for (let i = 0; i < files.length; i += 1) {
+        await uploadOneAdminPhoto(files[i], i, files.length);
+      }
+
+      setPhotoUpload(emptyPhotoUpload);
+      setPhotoInputKey((value) => value + 1);
+      setPhotoUploadProgress("");
+      setInfo(`${files.length} photo${files.length === 1 ? "" : "s"} uploaded successfully`);
+      await loadPhotos();
+    } catch (err) {
+      setError(err.message || "Photo upload failed");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  async function updatePhotoApproval(photo, approved) {
+    setError("");
+    setInfo("");
+
+    try {
+      await api(`/photos/${photo.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ approved }),
+      });
+      setInfo(approved ? "Photo approved" : "Photo moved back to review");
+      await loadPhotos();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deletePhoto(photo, deleteFiles = false) {
+    const message = deleteFiles
+      ? "Delete this photo record and the Cloudflare R2 files?"
+      : "Delete this photo record? The Cloudflare R2 files will be kept.";
+
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    setError("");
+    setInfo("");
+
+    try {
+      await api(`/photos/${photo.id}?deleteFiles=${deleteFiles ? "true" : "false"}`, {
+        method: "DELETE",
+      });
+      setInfo(deleteFiles ? "Photo and files deleted" : "Photo record deleted");
+      await loadPhotos();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   // ===================================
   // EXPORT CSV
   // ===================================
@@ -358,6 +635,349 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   }
 
+  function renderSummaryCards() {
+    if (activeTab === "photos") {
+      return (
+        <div style={styles.summaryRow}>
+          <div style={styles.summaryCard}>
+            <div style={styles.summaryAccentBar} />
+            <div style={styles.summaryLabel}>Photos</div>
+            <div style={styles.summaryValue}>{photos.length}</div>
+            <div style={styles.summaryHint}>Total photo records in the dashboard</div>
+          </div>
+
+          <div style={styles.summaryCard}>
+            <div style={styles.summaryAccentBarSoft} />
+            <div style={styles.summaryLabel}>Approved</div>
+            <div style={styles.summaryValue}>{approvedPhotos}</div>
+            <div style={styles.summaryHint}>Photos visible in the public gallery</div>
+          </div>
+
+          <div style={styles.summaryCard}>
+            <div style={styles.summaryAccentBarGold} />
+            <div style={styles.summaryLabel}>Needs Review</div>
+            <div style={styles.summaryValue}>{pendingReviewPhotos}</div>
+            <div style={styles.summaryHint}>Guest or admin uploads waiting for approval</div>
+          </div>
+
+          <div style={styles.summaryCard}>
+            <div style={styles.summaryAccentBarRose} />
+            <div style={styles.summaryLabel}>Guest Uploads</div>
+            <div style={styles.summaryValue}>{guestUploadedPhotos}</div>
+            <div style={styles.summaryHint}>Photos uploaded with an invitation code</div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={styles.summaryRow}>
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryAccentBar} />
+          <div style={styles.summaryLabel}>Households</div>
+          <div style={styles.summaryValue}>{rows.length}</div>
+          <div style={styles.summaryHint}>Total household records in the dashboard</div>
+        </div>
+
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryAccentBarSoft} />
+          <div style={styles.summaryLabel}>Completed Households</div>
+          <div style={styles.summaryValue}>
+            {rows.filter((row) => row.allResponded).length}
+          </div>
+          <div style={styles.summaryHint}>Households where every member has replied</div>
+        </div>
+
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryAccentBarGold} />
+          <div style={styles.summaryLabel}>Guests</div>
+          <div style={styles.summaryValue}>{totalGuests}</div>
+          <div style={styles.summaryHint}>Total invited guests across all households</div>
+        </div>
+
+        <div style={styles.summaryCard}>
+          <div style={styles.summaryAccentBarRose} />
+          <div style={styles.summaryLabel}>Completed Guests</div>
+          <div style={styles.summaryValue}>{completedGuests}</div>
+          <div style={styles.summaryHint}>Guests with an RSVP of yes or no</div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderHouseholdsTab() {
+    return (
+      <>
+        <div style={styles.toolbarCard}>
+          <div style={styles.toolbarHeader}>Search and review</div>
+          <input
+            style={styles.searchInput}
+            placeholder="Search household, code, member name, or RSVP..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div style={styles.tableCard}>
+          <div style={styles.tableHeader}>
+            <div style={styles.tableTitle}>Household records</div>
+          </div>
+
+          <div style={styles.tableWrap}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Code</th>
+                  <th style={styles.th}>URL</th>
+                  <th style={styles.th}>Household</th>
+                  <th style={styles.th}>Size</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}>Members</th>
+                  <th style={styles.th}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => (
+                  <tr key={row.code} style={styles.tr}>
+                    <td style={styles.tdCode}>{row.code}</td>
+                    <td style={styles.tdUrl}>{row.uniqueUrl}</td>
+                    <td style={styles.td}>{row.household}</td>
+                    <td style={styles.td}>{row.householdSize}</td>
+                    <td style={styles.td}>
+                      <StatusText row={row} />
+                    </td>
+                    <td style={styles.td}>
+                      {(row.members || [])
+                        .map((m) => `${m.name} (${m.rsvp || "pending"})`)
+                        .join(", ")}
+                    </td>
+                    <td style={styles.td}>
+                      <button
+                        style={styles.buttonTable}
+                        onClick={() => openEditor(row)}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {!loading && filteredRows.length === 0 ? (
+                  <tr>
+                    <td style={styles.emptyCell} colSpan="7">
+                      No households found.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  function renderPhotosTab() {
+    return (
+      <>
+        <div style={styles.photoUploadCard}>
+          <div>
+            <div style={styles.toolbarHeader}>Upload photos</div>
+            <p style={styles.tableSubtleText}>
+              Select one or more images. Each file is uploaded directly to Cloudflare R2 using the presigned URL flow, then saved to Firestore through the admin API.
+            </p>
+          </div>
+
+          <form onSubmit={uploadAdminPhoto} style={styles.photoUploadForm}>
+            <label style={styles.label}>
+              Image files
+              <input
+                key={photoInputKey}
+                style={styles.input}
+                type="file"
+                accept="image/*,.heic,.heif"
+                multiple
+                disabled={photoUploading}
+                onChange={(e) =>
+                  updatePhotoUploadField("files", Array.from(e.target.files || []))
+                }
+              />
+            </label>
+
+            <label style={styles.label}>
+              Album
+              <input
+                style={styles.input}
+                value={photoUpload.album}
+                onChange={(e) => updatePhotoUploadField("album", e.target.value)}
+                placeholder="ceremony"
+              />
+            </label>
+
+            <label style={styles.label}>
+              Alt text prefix
+              <input
+                style={styles.input}
+                value={photoUpload.altText}
+                onChange={(e) => updatePhotoUploadField("altText", e.target.value)}
+                placeholder="Bride and groom at the ceremony"
+              />
+            </label>
+
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={photoUpload.approved}
+                onChange={(e) => updatePhotoUploadField("approved", e.target.checked)}
+              />
+              Approve immediately
+            </label>
+
+            {photoUpload.files?.length ? (
+              <div style={styles.selectedFilesBox}>
+                <div style={styles.tableSubtleText}>
+                  {photoUpload.files.length} file{photoUpload.files.length === 1 ? "" : "s"} selected
+                </div>
+                <div style={styles.selectedFilesList}>
+                  {photoUpload.files.map((file) => (
+                    <span key={`${file.name}-${file.size}`} style={styles.selectedFilePill}>
+                      {file.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {photoUploadProgress ? (
+              <div style={styles.info}>{photoUploadProgress}</div>
+            ) : null}
+
+            <button
+              style={styles.buttonPrimary}
+              type="submit"
+              disabled={photoUploading || !photoUpload.files?.length}
+            >
+              {photoUploading ? "Uploading..." : "Upload selected photos"}
+            </button>
+          </form>
+        </div>
+
+        <div style={styles.toolbarCard}>
+          <div style={styles.toolbarHeader}>Search photos</div>
+          <input
+            style={styles.searchInput}
+            placeholder="Search photo ID, album, guest, invite code, or approval state..."
+            value={photoSearch}
+            onChange={(e) => setPhotoSearch(e.target.value)}
+          />
+        </div>
+
+        <div style={styles.tableCard}>
+          <div style={styles.tableHeader}>
+            <div style={styles.tableTitle}>Photo review</div>
+            <div style={styles.tableSubtleText}>
+              Approve guest uploads, review metadata, open images, or remove records.
+            </div>
+          </div>
+
+          <div style={styles.photoGrid}>
+            {filteredPhotos.map((photo) => (
+              <div key={photo.id} style={styles.photoCard}>
+                <a
+                  href={photo.url || photo.thumbUrl || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.photoPreviewLink}
+                >
+                  {photo.thumbUrl || photo.url ? (
+                    <img
+                      style={styles.photoImage}
+                      src={photo.thumbUrl || photo.url}
+                      alt={photo.altText || "Wedding photo"}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div style={styles.photoMissing}>No image URL</div>
+                  )}
+                </a>
+
+                <div style={styles.photoCardBody}>
+                  <div style={styles.photoCardTopRow}>
+                    <PhotoStatusText photo={photo} />
+                    <span style={styles.photoMetaPill}>{photo.album || "general"}</span>
+                  </div>
+
+                  <div style={styles.photoAltText}>
+                    {photo.altText || "No alt text provided"}
+                  </div>
+
+                  <div style={styles.photoMetaGrid}>
+                    <div>
+                      <div style={styles.photoMetaLabel}>Uploader</div>
+                      <div style={styles.photoMetaValue}>{photo.uploaderType || "admin"}</div>
+                    </div>
+                    <div>
+                      <div style={styles.photoMetaLabel}>Guest</div>
+                      <div style={styles.photoMetaValue}>{photo.guestName || "-"}</div>
+                    </div>
+                    <div>
+                      <div style={styles.photoMetaLabel}>Invite</div>
+                      <div style={styles.photoMetaValue}>{photo.inviteCode || "-"}</div>
+                    </div>
+                    <div>
+                      <div style={styles.photoMetaLabel}>Uploaded</div>
+                      <div style={styles.photoMetaValue}>{formatDateTime(photo.uploadedAt) || "-"}</div>
+                    </div>
+                  </div>
+
+                  <div style={styles.photoIdText}>{photo.id}</div>
+
+                  <div style={styles.photoButtons}>
+                    {photo.approved ? (
+                      <button
+                        style={styles.buttonTable}
+                        onClick={() => updatePhotoApproval(photo, false)}
+                      >
+                        Unapprove
+                      </button>
+                    ) : (
+                      <button
+                        style={styles.buttonPrimarySmall}
+                        onClick={() => updatePhotoApproval(photo, true)}
+                      >
+                        Approve
+                      </button>
+                    )}
+
+                    <a
+                      style={styles.buttonLink}
+                      href={photo.url || photo.thumbUrl || "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open
+                    </a>
+
+                    <button
+                      style={styles.buttonDangerSmall}
+                      onClick={() => deletePhoto(photo, false)}
+                    >
+                      Delete record
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {!photoLoading && filteredPhotos.length === 0 ? (
+              <div style={styles.emptyPhotoState}>No photos found.</div>
+            ) : null}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   // ===================================
   // LOGIN SCREEN
   // ===================================
@@ -373,7 +993,7 @@ export default function AdminDashboard() {
             <div style={styles.loginBadge}>Wedding Admin Portal Login</div>
             <h1 style={styles.heroTitle}>Tevin and Natallia</h1>
             <p style={styles.heroSubtitle}>
-              Sign in to manage households, guest details, unique codes, and RSVP progress.
+              Sign in to manage households, guest details, unique codes, RSVP progress, and gallery photos.
             </p>
 
             <form onSubmit={handleLogin} style={styles.form}>
@@ -423,118 +1043,51 @@ export default function AdminDashboard() {
             <div style={styles.topBadge}>Wedding Admin Dashboard</div>
             <h1 style={styles.dashboardTitle}>Tevin and Natallia</h1>
             <p style={styles.dashboardSubtitle}>
-              Manage households, update invitation links, and track response progress in one place.
+              Manage households, update invitation links, track RSVP progress, review guest photos, and upload gallery images.
             </p>
           </div>
 
           <div style={styles.headerButtons}>
-            <button style={styles.buttonSecondary} onClick={loadRows}>
+            <button style={styles.buttonSecondary} onClick={refreshCurrentTab}>
               Refresh
             </button>
-            <button style={styles.buttonSecondary} onClick={exportCsv}>
-              Export CSV
-            </button>
-            <button style={styles.buttonPrimary} onClick={() => openEditor(null)}>
-              Add household
-            </button>
+            {activeTab === "households" ? (
+              <>
+                <button style={styles.buttonSecondary} onClick={exportCsv}>
+                  Export CSV
+                </button>
+                <button style={styles.buttonPrimary} onClick={() => openEditor(null)}>
+                  Add household
+                </button>
+              </>
+            ) : null}
             <button style={styles.buttonGhost} onClick={handleLogout}>
               Logout
             </button>
           </div>
         </div>
 
-        <div style={styles.summaryRow}>
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryAccentBar} />
-            <div style={styles.summaryLabel}>Households</div>
-            <div style={styles.summaryValue}>{rows.length}</div>
-            <div style={styles.summaryHint}>Total household records in the dashboard</div>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryAccentBarSoft} />
-            <div style={styles.summaryLabel}>Completed Households</div>
-            <div style={styles.summaryValue}>
-              {rows.filter((row) => row.allResponded).length}
-            </div>
-            <div style={styles.summaryHint}>Households where every member has replied</div>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryAccentBarGold} />
-            <div style={styles.summaryLabel}>Guests</div>
-            <div style={styles.summaryValue}>{totalGuests}</div>
-            <div style={styles.summaryHint}>Total invited guests across all households</div>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryAccentBarRose} />
-            <div style={styles.summaryLabel}>Completed Guests</div>
-            <div style={styles.summaryValue}>{completedGuests}</div>
-            <div style={styles.summaryHint}>Guests with an RSVP of yes or no</div>
-          </div>
+        <div style={styles.tabBar}>
+          <button
+            style={activeTab === "households" ? styles.tabButtonActive : styles.tabButton}
+            onClick={() => setActiveTab("households")}
+          >
+            Households
+          </button>
+          <button
+            style={activeTab === "photos" ? styles.tabButtonActive : styles.tabButton}
+            onClick={() => setActiveTab("photos")}
+          >
+            Photos
+          </button>
         </div>
 
-        <div style={styles.toolbarCard}>
-          <div style={styles.toolbarHeader}>Search and review</div>
-          <input
-            style={styles.searchInput}
-            placeholder="Search household, code, member name, or RSVP..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        {renderSummaryCards()}
 
         {error ? <div style={styles.error}>{error}</div> : null}
         {info ? <div style={styles.info}>{info}</div> : null}
 
-        <div style={styles.tableCard}>
-          <div style={styles.tableHeader}>
-            <div style={styles.tableTitle}>Household records</div>
-          </div>
-
-          <div style={styles.tableWrap}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Code</th>
-                  <th style={styles.th}>URL</th>
-                  <th style={styles.th}>Household</th>
-                  <th style={styles.th}>Size</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Members</th>
-                  <th style={styles.th}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((row) => (
-                  <tr key={row.code} style={styles.tr}>
-                    <td style={styles.tdCode}>{row.code}</td>
-                    <td style={styles.tdUrl}>{row.uniqueUrl}</td>
-                    <td style={styles.td}>{row.household}</td>
-                    <td style={styles.td}>{row.householdSize}</td>
-                    <td style={styles.td}>
-                      <StatusText row={row} />
-                    </td>
-                    <td style={styles.td}>
-                      {(row.members || [])
-                        .map((m) => `${m.name} (${m.rsvp || "pending"})`)
-                        .join(", ")}
-                    </td>
-                    <td style={styles.td}>
-                      <button
-                        style={styles.buttonTable}
-                        onClick={() => openEditor(row)}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {activeTab === "photos" ? renderPhotosTab() : renderHouseholdsTab()}
 
         {editorOpen && (
           <div style={styles.modalBackdrop}>
@@ -792,7 +1345,7 @@ const styles = {
     alignItems: "flex-start",
     gap: "20px",
     flexWrap: "wrap",
-    marginBottom: "24px",
+    marginBottom: "18px",
     background: "rgba(255,255,255,0.76)",
     backdropFilter: "blur(14px)",
     border: "1px solid rgba(182, 201, 183, 0.3)",
@@ -830,10 +1383,6 @@ const styles = {
     maxWidth: "760px",
   },
 
-  title: {
-    margin: "0 0 16px 0",
-  },
-
   form: {
     display: "grid",
     gap: "16px",
@@ -845,6 +1394,16 @@ const styles = {
     fontSize: "13px",
     fontWeight: 600,
     color: "#3f5a49",
+  },
+
+  checkboxLabel: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#3f5a49",
+    minHeight: "46px",
   },
 
   input: {
@@ -861,7 +1420,6 @@ const styles = {
     boxShadow: "inset 0 1px 2px rgba(33, 53, 40, 0.03)",
   },
 
-  // Read-only input styling for generated values
   inputReadOnly: {
     width: "100%",
     marginTop: "4px",
@@ -899,6 +1457,17 @@ const styles = {
     boxShadow: "0 10px 24px rgba(90, 128, 96, 0.18)",
   },
 
+  buttonPrimarySmall: {
+    padding: "10px 14px",
+    borderRadius: "12px",
+    border: "1px solid rgba(74, 124, 86, 0.1)",
+    background: "linear-gradient(135deg, #6f9f73 0%, #547a57 100%)",
+    color: "#fffdf8",
+    cursor: "pointer",
+    fontWeight: 700,
+    boxShadow: "0 8px 18px rgba(90, 128, 96, 0.14)",
+  },
+
   buttonSecondary: {
     padding: "12px 18px",
     borderRadius: "14px",
@@ -931,6 +1500,16 @@ const styles = {
     fontWeight: 700,
   },
 
+  buttonDangerSmall: {
+    padding: "10px 12px",
+    borderRadius: "12px",
+    border: "none",
+    background: "linear-gradient(135deg, #c96b57 0%, #b44f42 100%)",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 700,
+  },
+
   buttonTable: {
     padding: "10px 14px",
     borderRadius: "12px",
@@ -941,11 +1520,57 @@ const styles = {
     fontWeight: 600,
   },
 
+  buttonLink: {
+    padding: "10px 14px",
+    borderRadius: "12px",
+    border: "1px solid #d7e2d5",
+    background: "rgba(255,255,255,0.95)",
+    color: "#2f4f3a",
+    cursor: "pointer",
+    fontWeight: 700,
+    textDecoration: "none",
+    display: "inline-flex",
+    alignItems: "center",
+  },
+
   headerButtons: {
     display: "flex",
     gap: "10px",
     flexWrap: "wrap",
     alignItems: "center",
+  },
+
+  tabBar: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "20px",
+    background: "rgba(255,255,255,0.76)",
+    border: "1px solid rgba(185, 203, 184, 0.28)",
+    borderRadius: "20px",
+    padding: "8px",
+    width: "fit-content",
+    boxShadow: "0 12px 28px rgba(74, 97, 75, 0.06)",
+  },
+
+  tabButton: {
+    padding: "11px 18px",
+    borderRadius: "14px",
+    border: "1px solid transparent",
+    background: "transparent",
+    color: "#4f6558",
+    cursor: "pointer",
+    fontWeight: 800,
+  },
+
+  tabButtonActive: {
+    padding: "11px 18px",
+    borderRadius: "14px",
+    border: "1px solid #d6e3d3",
+    background: "rgba(255,255,255,0.95)",
+    color: "#23412f",
+    cursor: "pointer",
+    fontWeight: 800,
+    boxShadow: "0 8px 18px rgba(86, 104, 88, 0.08)",
   },
 
   summaryRow: {
@@ -1040,10 +1665,6 @@ const styles = {
     marginBottom: "12px",
   },
 
-  searchRow: {
-    marginBottom: "16px",
-  },
-
   tableCard: {
     background: "rgba(255,255,255,0.84)",
     backdropFilter: "blur(12px)",
@@ -1068,6 +1689,7 @@ const styles = {
   tableSubtleText: {
     fontSize: "13px",
     color: "#6c8171",
+    lineHeight: 1.5,
   },
 
   tableWrap: {
@@ -1125,6 +1747,13 @@ const styles = {
     wordBreak: "break-word",
   },
 
+  emptyCell: {
+    padding: "28px",
+    color: "#6c8171",
+    fontSize: "14px",
+    textAlign: "center",
+  },
+
   error: {
     margin: "12px 0 20px 0",
     padding: "14px 16px",
@@ -1163,6 +1792,170 @@ const styles = {
     borderRadius: "999px",
     fontSize: "12px",
     fontWeight: 700,
+  },
+
+  photoUploadCard: {
+    display: "grid",
+    gap: "18px",
+    background: "rgba(255,255,255,0.84)",
+    backdropFilter: "blur(12px)",
+    border: "1px solid rgba(185, 203, 184, 0.3)",
+    borderRadius: "28px",
+    padding: "22px",
+    marginBottom: "20px",
+    boxShadow: "0 20px 48px rgba(74, 97, 75, 0.08)",
+  },
+
+  photoUploadForm: {
+    display: "grid",
+    gridTemplateColumns: "minmax(240px, 1.4fr) minmax(160px, 0.7fr) minmax(220px, 1fr) auto auto",
+    gap: "14px",
+    alignItems: "end",
+  },
+
+  photoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+    gap: "18px",
+    padding: "20px",
+  },
+
+  photoCard: {
+    overflow: "hidden",
+    borderRadius: "22px",
+    background: "rgba(255,255,255,0.94)",
+    border: "1px solid rgba(221, 229, 218, 1)",
+    boxShadow: "0 12px 28px rgba(86, 104, 88, 0.08)",
+  },
+
+  photoPreviewLink: {
+    display: "block",
+    width: "100%",
+    aspectRatio: "4 / 3",
+    background: "rgba(241, 245, 240, 0.95)",
+    overflow: "hidden",
+  },
+
+  photoImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
+
+  photoMissing: {
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#6c8171",
+    fontSize: "14px",
+  },
+
+  photoCardBody: {
+    padding: "16px",
+    display: "grid",
+    gap: "12px",
+  },
+
+  photoCardTopRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "8px",
+    alignItems: "center",
+  },
+
+  photoMetaPill: {
+    display: "inline-block",
+    padding: "6px 10px",
+    background: "rgba(240, 246, 238, 0.9)",
+    color: "#4f6756",
+    borderRadius: "999px",
+    fontSize: "12px",
+    fontWeight: 700,
+  },
+
+  photoAltText: {
+    color: "#294332",
+    fontSize: "14px",
+    fontWeight: 700,
+    lineHeight: 1.45,
+  },
+
+  photoMetaGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+  },
+
+  photoMetaLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    color: "#7b8d7f",
+    fontWeight: 800,
+    marginBottom: "3px",
+  },
+
+  photoMetaValue: {
+    fontSize: "13px",
+    color: "#2f4f3a",
+    wordBreak: "break-word",
+  },
+
+  photoIdText: {
+    padding: "9px 10px",
+    borderRadius: "12px",
+    background: "rgba(249, 247, 242, 0.92)",
+    color: "#6c8171",
+    fontSize: "12px",
+    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+    wordBreak: "break-all",
+  },
+
+  photoButtons: {
+    display: "flex",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+
+
+  selectedFilesBox: {
+    gridColumn: "1 / -1",
+    padding: "12px 14px",
+    borderRadius: "16px",
+    border: "1px solid rgba(216, 227, 210, 0.9)",
+    background: "rgba(255,255,255,0.7)",
+  },
+
+  selectedFilesList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    marginTop: "10px",
+  },
+
+  selectedFilePill: {
+    display: "inline-flex",
+    alignItems: "center",
+    maxWidth: "260px",
+    padding: "7px 10px",
+    borderRadius: "999px",
+    background: "rgba(221, 235, 215, 0.95)",
+    color: "#45634e",
+    fontSize: "12px",
+    fontWeight: 700,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+
+  emptyPhotoState: {
+    gridColumn: "1 / -1",
+    padding: "28px",
+    color: "#6c8171",
+    fontSize: "14px",
+    textAlign: "center",
   },
 
   modalBackdrop: {
