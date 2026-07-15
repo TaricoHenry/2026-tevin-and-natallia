@@ -5,7 +5,7 @@
 (() => {
   const PROJECT_ID = "tevin-wedding";
   const LOCAL_API_BASE = `http://127.0.0.1:5001/${PROJECT_ID}/us-central1/api/v1`;
-  const PRODUCTION_API_BASE = "/v1";
+  const PRODUCTION_API_BASE = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/api/v1`;
 
   const galleryGrid = document.getElementById("galleryGrid");
   const galleryLoading = document.getElementById("galleryLoading");

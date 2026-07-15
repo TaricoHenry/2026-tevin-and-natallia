@@ -14,3 +14,4 @@ expected_firestore_export.csv
 import_warnings.csv
 csv/guestList.preview.csv
 csv/guestList.warnings.csv
+.env*
